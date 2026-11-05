@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>HIFS 차량 등록</title>
+<style>
+  /* 레이아웃: 한 열 카드형(최대 880px), 상단 3개 탭 → 섹션 전환. 학교 남색 + 차분한 청회색 중성색 */
+  :root{
+    --header:#1f3a6b; --on-header:#ffffff;
+    --navy:#1f3a6b; --navy2:#2c5196; --on-navy:#ffffff; --accent-fg:#1f3a6b; --link:#2c5196;
+    --bg:#f4f6fa; --card:#ffffff; --card2:#fbfcfe; --chip:#f3f4f6; --input:#ffffff; --disabled:#f1f3f7; --th:#f7f9fc;
+    --line:#dde3ec; --text:#1d2533; --muted:#6b7588;
+    --danger:#c0392b; --danger-bg:#fdeceb; --invalid-bg:#fff7f6;
+    --ok:#1e8a52; --ok-bg:#e6f5ec; --accent:#eef3fb;
+    --warn:#fff6e0; --warn-fg:#7a5a00; --hit:#ffe9a8; --hit-fg:#1d2533;
+    --toast-bg:#222833; --toast-fg:#ffffff; --scrim:rgba(15,22,36,.45);
+    --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --header:#16294c; --on-header:#f1f4fa;
+      --navy:#3a64b0; --navy2:#4f7ac8; --on-navy:#ffffff; --accent-fg:#b9cdf3; --link:#8fb2ff;
+      --bg:#121722; --card:#1a2130; --card2:#1e2636; --chip:#232c3d; --input:#141a26; --disabled:#20283a; --th:#202a3b;
+      --line:#2e3a50; --text:#e6eaf2; --muted:#98a3b8;
+      --danger:#ff8a7a; --danger-bg:#3a1e1c; --invalid-bg:#2e1c1c;
+      --ok:#5fd394; --ok-bg:#183326; --accent:#1f2c45;
+      --warn:#3a3218; --warn-fg:#f0d589; --hit:#6b5714; --hit-fg:#fff3c4;
+      --toast-bg:#e6eaf2; --toast-fg:#121722; --scrim:rgba(0,0,0,.6);
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --header:#16294c; --on-header:#f1f4fa;
+    --navy:#3a64b0; --navy2:#4f7ac8; --on-navy:#ffffff; --accent-fg:#b9cdf3; --link:#8fb2ff;
+    --bg:#121722; --card:#1a2130; --card2:#1e2636; --chip:#232c3d; --input:#141a26; --disabled:#20283a; --th:#202a3b;
+    --line:#2e3a50; --text:#e6eaf2; --muted:#98a3b8;
+    --danger:#ff8a7a; --danger-bg:#3a1e1c; --invalid-bg:#2e1c1c;
+    --ok:#5fd394; --ok-bg:#183326; --accent:#1f2c45;
+    --warn:#3a3218; --warn-fg:#f0d589; --hit:#6b5714; --hit-fg:#fff3c4;
+    --toast-bg:#e6eaf2; --toast-fg:#121722; --scrim:rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;font-size:15px}
+  header.site{background:var(--header);color:var(--on-header);padding-block:18px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+  header.site h1{margin:0 auto;max-width:880px;font-size:1.35rem;letter-spacing:-.01em}
+  main{max-width:912px;margin:0 auto;padding-block:16px 60px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+  a{color:var(--link)}
+  code{font-size:.85em;background:var(--accent);color:var(--accent-fg);padding:1px 5px;border-radius:4px}
+  .demo-banner{background:var(--warn);color:var(--warn-fg);border-radius:8px;padding:8px 12px;font-size:.85rem;margin-bottom:12px}
+
+  nav.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  nav.tabs button{padding:14px 8px;border:1px solid var(--line);background:var(--card);border-radius:var(--radius);font-size:1rem;font-weight:600;color:var(--accent-fg);cursor:pointer;font-family:inherit}
+  nav.tabs button.active{background:var(--navy);color:var(--on-navy);border-color:var(--navy)}
+  nav.tabs button .lock{font-size:.75rem;font-weight:500;opacity:.75;display:block}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;min-width:0}
+  h2{font-size:1.15rem;margin:0 0 12px;text-wrap:balance}
+  h3{font-size:1rem;margin:0}
+  .notice{background:var(--accent);border-radius:8px;padding:10px 12px;font-size:.9rem;color:var(--accent-fg);margin-bottom:12px}
+  .muted{color:var(--muted);font-size:.88rem}
+
+  .field{margin-bottom:12px}
+  .field > label{display:block;font-weight:600;font-size:.92rem;margin-bottom:6px}
+  .field em{color:var(--danger);font-style:normal}
+  input[type=text],input[type=tel],input[type=email],input[type=password],input:not([type]),select,textarea{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:1rem;font-family:inherit;background:var(--input);color:var(--text)}
+  input:disabled{background:var(--disabled)}
+  textarea{min-height:70px;resize:vertical}
+  :focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
+  .invalid{border-color:var(--danger)!important;background:var(--invalid-bg)!important}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .seg-opt{display:block;min-width:0}
+  .seg-opt input{position:absolute;opacity:0;pointer-events:none}
+  .seg-opt span{display:flex;align-items:center;justify-content:center;min-height:56px;padding:10px 6px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--chip);color:var(--text);font-size:1.02rem;font-weight:700;text-align:center;line-height:1.25;word-break:keep-all}
+  .seg-opt span:hover{border-color:var(--navy2)}
+  .seg-opt input:checked + span{background:var(--navy);color:var(--on-navy);border-color:var(--navy)}
+  .seg-opt input:focus-visible + span{outline:2px solid var(--navy2);outline-offset:2px}
+  .seg.invalid span{border-color:var(--danger)}
+
+  .student-card{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--card2)}
+  .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+
+  .row{display:grid;gap:8px;margin-bottom:8px;align-items:center}
+  .contact-row{grid-template-columns:120px 1fr 36px}
+  .vehicle-row{grid-template-columns:1fr 1fr 36px}
+  hr{border:none;border-top:1px solid var(--line);margin:18px 0}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:.95rem;font-weight:600;cursor:pointer;color:var(--text);font-family:inherit}
+  .btn.primary{background:var(--navy);border-color:var(--navy);color:var(--on-navy)}
+  .btn.danger-fill{background:var(--danger);border-color:var(--danger);color:var(--card)}
+  .btn.block{width:100%;padding:14px;font-size:1.05rem}
+  .btn.ghost{color:var(--accent-fg)}
+  .btn.add{border-style:dashed;color:var(--accent-fg);width:100%}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .icon-btn{width:36px;height:40px;border:1px solid var(--line);border-radius:8px;background:var(--card);cursor:pointer;color:var(--muted)}
+  .link-btn{background:none;border:none;color:var(--link);cursor:pointer;font-size:.88rem;padding:4px 6px;font-family:inherit}
+  .link-btn.danger{color:var(--danger)}
+
+  .consent{display:flex;gap:8px;align-items:flex-start;font-size:.9rem}
+  .error-box{background:var(--danger-bg);color:var(--danger);border-radius:8px;padding:10px 12px;font-size:.9rem;margin-bottom:12px}
+  .success{text-align:center;padding:28px 18px}
+  .success .check{font-size:2.4rem;color:var(--ok)}
+  .admin-only{border:1px dashed var(--navy2);border-radius:10px;padding:12px;background:var(--accent)}
+
+  .search-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .photo-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  #ocrBox{margin-top:12px}
+  #ocrPreview{max-width:100%;max-height:220px;border-radius:8px;display:block;margin-bottom:6px}
+  .result{border-left:4px solid var(--navy)}
+  .result.staff{border-left-color:var(--ok)}
+  .result dl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;margin:0}
+  .result dt{color:var(--muted);font-size:.9rem}
+  .result dd{margin:0;font-weight:500;min-width:0}
+  .badge{display:inline-block;font-size:.78rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--accent);color:var(--accent-fg);margin-bottom:8px}
+  .badge.staff{background:var(--ok-bg);color:var(--ok)}
+  .plate{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;white-space:nowrap}
+  .plate.hit{background:var(--hit);color:var(--hit-fg);padding:0 4px;border-radius:4px}
+  td.nowrap{white-space:nowrap}
+
+  .role-pill{display:inline-block;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--accent);color:var(--accent-fg);margin-left:4px;vertical-align:1px}
+  .role-pill.super{background:var(--navy);color:var(--on-navy)}
+  table.admins-table{min-width:520px}
+  .role-select{width:auto;padding:6px 8px;font-size:.9rem}
+  .admin-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;font-size:.92rem;flex-wrap:wrap}
+  .subtabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .subtabs button{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font-family:inherit;font-size:.92rem}
+  .subtabs button.active{background:var(--navy2);color:var(--on-navy);border-color:var(--navy2)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .chips button{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font-size:.88rem;font-family:inherit;font-variant-numeric:tabular-nums}
+  .chips button.active{background:var(--navy);color:var(--on-navy);border-color:var(--navy)}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:820px;background:var(--card)}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:var(--th);font-weight:600;white-space:nowrap}
+  .lock-msg{color:var(--danger);font-size:.9rem;margin-top:8px}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);padding:10px 16px;border-radius:8px;font-size:.92rem;z-index:99;max-width:90vw}
+
+  .modal-back{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+  .modal{background:var(--card);color:var(--text);border-radius:var(--radius);padding:18px;width:100%;max-width:420px;display:grid;gap:10px;border:1px solid var(--line)}
+  .modal p{margin:0}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px}
+
+  @media (max-width:560px){
+    .grid2{grid-template-columns:1fr}
+    .contact-row{grid-template-columns:90px 1fr 36px}
+    .vehicle-row{grid-template-columns:1fr 36px}
+    .vehicle-row .owner{grid-column:1 / 2}
+    .result dl{grid-template-columns:90px 1fr}
+    .seg-opt span{font-size:.95rem;min-height:52px}
+  }
+  @media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto!important} }
+</style>
+</head>
+<body>
+
+<header class="site"><h1>HIFS 차량 등록</h1></header>
+
+<main>
+  <div class="demo-banner" id="demoBanner" hidden>미리보기 모드: 데이터가 이 브라우저에만 저장됩니다. 파일 안 CONFIG에 Supabase 주소와 키를 넣으면 실제 DB에 저장됩니다.</div>
+
+  <nav class="tabs">
+    <button type="button" data-tab="register" class="active">차량 등록</button>
+    <button type="button" data-tab="lookup" id="navLookup">차량 조회<span class="lock" id="lookupLock">관리자 전용</span></button>
+    <button type="button" data-tab="admin" id="navAdmin">관리자</button>
+  </nav>
+
+  <!-- ============ 1) 차량 등록 ============ -->
+  <section id="sec-register">
+    <form id="regForm" class="card" novalidate>
+      <h2>차량 번호 등록</h2>
+      <div class="notice">형제자매가 HIFS 유치부 / HIFS Global / HIFS English 에 함께 다니는 경우, 아래 <b>[+ 형제자매 추가]</b> 버튼으로 한 번에 등록해 주세요.</div>
+
+      <div id="studentList"></div>
+      <button type="button" class="btn add" id="addStudentBtn">+ 형제자매 추가</button>
+
+      <hr>
+
+      <div class="field">
+        <label>학부모 연락처 <em>*</em> <span class="muted">(최소 1개)</span></label>
+        <div id="contactList"></div>
+        <button type="button" class="btn add" id="addContactBtn">+ 연락처 추가 (할아버지, 할머니, 이모, 삼촌 등)</button>
+      </div>
+
+      <div class="field">
+        <label>차량 번호 <em>*</em> <span class="muted">(최소 1대)</span></label>
+        <div id="vehicleList"></div>
+        <button type="button" class="btn add" id="addVehicleBtn">+ 차량 추가</button>
+      </div>
+
+      <div class="field admin-only" id="regMemoWrap" hidden>
+        <label>메모 (관리자 전용 · 특이사항)</label>
+        <textarea id="regMemo" placeholder="예: 할머니가 주로 픽업"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="consent"><input type="checkbox" id="consent"> <span>[필수] 차량 출입 관리를 위한 개인정보(학생 이름, 반, 연락처, 차량 번호) 수집·이용에 동의합니다.</span></label>
+      </div>
+
+      <div id="regErrors" class="error-box" hidden></div>
+      <button type="submit" class="btn primary block" id="regSubmit">등록하기</button>
+    </form>
+
+    <div id="regDone" class="card success" hidden>
+      <div class="check">✓</div>
+      <h2>등록이 완료되었습니다</h2>
+      <p id="regDoneSummary" class="muted"></p>
+      <button type="button" class="btn primary" id="regAgainBtn">다른 학생 등록하기</button>
+    </div>
+  </section>
+
+  <!-- ============ 2) 차량 조회 (관리자 로그인 시) ============ -->
+  <section id="sec-lookup" hidden>
+    <div class="card">
+      <h2>차량 번호 조회</h2>
+      <div class="search-row">
+        <input id="plateQuery" type="text" placeholder="차량 번호 또는 뒷자리 4자리 (예: 123가 4567 / 4567)" autocomplete="off">
+        <button type="button" class="btn primary" id="searchBtn">조회</button>
+      </div>
+      <div class="photo-row">
+        <label class="btn ghost">사진 촬영<input type="file" accept="image/*" capture="environment" id="camInput" hidden></label>
+        <label class="btn ghost">사진 선택<input type="file" accept="image/*" id="fileInput" hidden></label>
+      </div>
+      <div id="ocrBox" hidden>
+        <img id="ocrPreview" alt="업로드한 차량 사진">
+        <p id="ocrStatus" class="muted"></p>
+      </div>
+    </div>
+    <div id="results"></div>
+  </section>
+
+  <!-- ============ 3) 관리자 ============ -->
+  <section id="sec-admin" hidden>
+    <div id="loginBox" class="card">
+      <h2>관리자 로그인</h2>
+      <form id="pwStep" novalidate>
+        <div class="field"><label>이메일</label><input type="email" id="loginEmail" autocomplete="username"></div>
+        <div class="field"><label>비밀번호</label><input type="password" id="loginPw" autocomplete="current-password"></div>
+        <button type="submit" class="btn primary block" id="loginBtn">로그인</button>
+      </form>
+
+
+      <p class="lock-msg" id="loginMsg" hidden></p>
+      <p class="muted" id="demoCreds" style="margin-top:10px" hidden>※ 미리보기 계정 (비밀번호 hifs1234!)<br>admin@hifs.example — 최고 관리자 · staff@hifs.example — 일반 관리자</p>
+    </div>
+
+    <div id="adminPanel" hidden>
+      <div class="admin-bar">
+        <span>관리자: <b id="adminWho"></b><span id="adminRole" class="role-pill"></span></span>
+        <button type="button" class="btn" id="logoutBtn">로그아웃</button>
+      </div>
+      <div class="subtabs">
+        <button type="button" data-sub="list" class="active">등록 현황</button>
+        <button type="button" data-sub="student">학생 등록</button>
+        <button type="button" data-sub="staff">교직원 등록</button>
+        <button type="button" data-sub="csv" class="super-only">CSV 업로드</button>
+        <button type="button" data-sub="admins" class="super-only">관리자 관리</button>
+      </div>
+
+      <div id="sub-student" hidden></div>
+
+      <div id="sub-list" class="card">
+        <div class="chips" id="filterChips"></div>
+        <input type="text" id="adminSearch" placeholder="이름, 반, 차량 번호, 연락처 검색" style="margin-bottom:10px">
+        <div class="table-wrap"><table><thead><tr>
+          <th>소속</th><th>이름</th><th>반 / 부서</th><th>연락처</th><th>차량 번호</th><th>형제자매</th><th>메모</th><th>관리</th>
+        </tr></thead><tbody id="adminRows"></tbody></table></div>
+      </div>
+
+      <form id="staffForm" class="card" hidden novalidate>
+        <h2>교직원 등록</h2>
+        <div class="grid2">
+          <div class="field"><label>한글 이름 <em>*</em></label><input id="stNameKo" placeholder="예: 김힙스"></div>
+          <div class="field"><label>영어 이름</label><input id="stNameEn" placeholder="예: Cathy"></div>
+          <div class="field"><label>부서 <em>*</em></label><input id="stDept" placeholder="예: 교무부"></div>
+          <div class="field"><label>담당</label><input id="stRole" placeholder="예: 1학년 담임"></div>
+        </div>
+        <div class="field"><label>연락처 <em>*</em></label><input type="tel" id="stPhone" inputmode="numeric" placeholder="예: 010-1234-5678"></div>
+        <div class="field">
+          <label>차량 번호 <em>*</em></label>
+          <div id="stVehicleList"></div>
+          <button type="button" class="btn add" id="stAddVehicleBtn">+ 차량 추가</button>
+        </div>
+        <div class="field"><label>메모 (특이사항)</label><textarea id="stMemo"></textarea></div>
+        <div id="staffErrors" class="error-box" hidden></div>
+        <button type="submit" class="btn primary block">교직원 등록</button>
+      </form>
+
+      <div id="sub-csv" class="card" hidden>
+        <h2>CSV 일괄 업로드</h2>
+        <p class="muted">양식을 내려받아 엑셀에서 작성 후 CSV로 저장해 업로드하세요. 같은 <b>형제그룹</b> 값을 가진 학생은 형제자매로 묶이고 연락처·차량이 공유됩니다.<br>
+        연락처: <code>부:010-1234-5678|모:010-2345-6789</code> · 차량번호: <code>123가 4567(아빠)|45나 6789(엄마)</code></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button type="button" class="btn" id="csvTemplateBtn">양식 다운로드</button>
+          <label class="btn primary">CSV 파일 선택<input type="file" accept=".csv,text/csv" id="csvInput" hidden></label>
+        </div>
+        <div id="csvPreview"></div>
+      </div>
+
+      <!-- 관리자 관리 (최고 관리자 전용) -->
+      <div id="sub-admins" class="card" hidden>
+        <h2>관리자 관리</h2>
+        <p class="muted">최고 관리자: 조회·등록·메모 + 삭제, CSV 업로드, 관리자 관리<br>일반 관리자: 조회·등록·메모</p>
+        <div class="table-wrap"><table class="admins-table"><thead><tr><th>이름</th><th>이메일</th><th>권한</th><th>관리</th></tr></thead><tbody id="adminList"></tbody></table></div>
+        <form id="adminAddForm" novalidate style="margin-top:18px">
+          <h3 style="margin-bottom:10px">관리자 추가</h3>
+          <p class="notice" id="adminAddHelp">추가할 교직원의 계정을 먼저 Supabase의 Authentication → Users에서 만든 뒤, 같은 이메일을 여기에 입력하세요.</p>
+          <div class="grid2">
+            <div class="field"><label for="admEmail">이메일 <em>*</em></label><input type="email" id="admEmail" placeholder="예: teacher@hifs.kr"></div>
+            <div class="field"><label for="admName">이름</label><input id="admName" placeholder="예: 김힙스"></div>
+          </div>
+          <div class="field"><label for="admRole">권한</label><select id="admRole"><option value="staff">일반 관리자</option><option value="super">최고 관리자</option></select></div>
+          <div id="adminAddErrors" class="error-box" hidden></div>
+          <button type="submit" class="btn primary block">관리자로 추가</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="modal-back" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <p id="modalMsg" class="muted"></p>
+    <textarea id="modalInput" hidden></textarea>
+    <div class="modal-actions"><button type="button" class="btn" id="modalCancel">취소</button><button type="button" class="btn primary" id="modalOk">확인</button></div>
+  </div>
+</div>
+
+<datalist id="relList">
+  <option value="부"><option value="모"><option value="할아버지"><option value="할머니">
+  <option value="외할아버지"><option value="외할머니"><option value="이모"><option value="고모">
+  <option value="삼촌"><option value="외삼촌"><option value="기타">
+</datalist>
+
+<script>
+/* =========================================================
+   설정 — 여기만 고치면 됩니다
+   ========================================================= */
+const CONFIG = {
+  // ▼ Supabase 대시보드 > Project Settings > API 에서 복사
+  //   비워 두면 '미리보기 모드'(이 브라우저에만 저장)로 동작합니다.
+  SUPABASE_URL: 'https://vmphycxdewdgtudoboun.supabase.co/rest/v1/',        // 예: 'https://abcdefgh.supabase.co'
+  SUPABASE_ANON_KEY: 'sb_publishable_fDv9jsGnumYp8hnH9WLXrg_qc6aDkzd',   // 'anon public' 또는 'publishable' 키 (공개돼도 되는 키). ⚠ service_role / secret 키는 절대 넣지 마세요.
+
+  AFFILIATIONS: ['HIFS 유치부', 'HIFS Global', 'HIFS English'],
+  CLASS_PLACEHOLDER: { 'HIFS 유치부': '예: Secret Garden', 'HIFS Global': '예: 1학년 1반' },
+  // 드롭다운 반 목록 (Supabase 연결 시 class_options 테이블 값이 우선)
+  CLASS_OPTIONS: { 'HIFS English': ['월수금 1부', '월수금 2부', '화목 1부', '화목 2부'] },
+
+  HIDE_ADMIN_ENTRY: true,  // true: 외부인에게 '차량 조회/관리자' 버튼 숨김 → 관리자 링크(주소 끝 #admin)로만 접근
+  ADMIN_HASH: 'admin',     // 관리자 링크 끝부분. 바꾸면 관리자 링크도 '주소#바꾼값'으로 바뀝니다 (영문·숫자·하이픈만)
+  DEMO_PASSWORD: 'hifs1234!', // 미리보기 모드 전용 (미리보기 관리자 계정 공통 비밀번호)
+  MAX_LOGIN_FAIL: 5, LOCK_MINUTES: 10, IDLE_LOGOUT_MINUTES: 120,  // 2시간 동안 사용하지 않으면 자동 로그아웃
+};
+const USE_SUPABASE = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+let sb = null;
+
+/* =========================================================
+   공통 유틸
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const $$ = (s, root = document) => [...root.querySelectorAll(s)];
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const PLATE_RE = /^([가-힣]{2})?(\d{2,3})([가-힣])(\d{4})$/;          // 서울12가3456 / 12가3456 / 123가4567
+const normPlate = s => String(s || '').replace(/[\s-]/g, '');
+const formatPlate = s => { const m = normPlate(s).match(PLATE_RE); return m ? `${m[1] ? m[1] + ' ' : ''}${m[2]}${m[3]} ${m[4]}` : String(s || '').trim(); };
+const isPlate = s => PLATE_RE.test(normPlate(s));
+const PHONE_RE = /^0\d{1,2}-\d{3,4}-\d{4}$/;
+function fmtPhone(v){
+  const d = String(v).replace(/\D/g, '').slice(0, 11);
+  if (d.length < 4) return d;
+  if (d.length < 8) return d.slice(0,3) + '-' + d.slice(3);
+  if (d.length === 10) return d.slice(0,3) + '-' + d.slice(3,6) + '-' + d.slice(6);
+  return d.slice(0,3) + '-' + d.slice(3,7) + '-' + d.slice(7);
+}
+function toast(msg){ const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); }
+function loadScript(src){ return new Promise((ok, fail) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
+const errMsg = err => (err && err.message) ? err.message : '알 수 없는 오류가 발생했습니다.';
+
+// 확인/입력 창 (브라우저 기본 confirm/prompt 대신 사용)
+function ask({ title, message = '', input = null, okText = '확인', danger = false }){
+  return new Promise(resolve => {
+    const m = $('#modal'), inp = $('#modalInput'), ok = $('#modalOk'), cancel = $('#modalCancel');
+    $('#modalTitle').textContent = title;
+    $('#modalMsg').textContent = message; $('#modalMsg').hidden = !message;
+    inp.hidden = input === null; inp.value = input ?? '';
+    ok.textContent = okText; ok.classList.toggle('primary', !danger); ok.classList.toggle('danger-fill', danger);
+    m.hidden = false; setTimeout(() => (input === null ? ok : inp).focus(), 0);
+    const done = v => { m.hidden = true; ok.onclick = cancel.onclick = m.onkeydown = null; resolve(v); };
+    ok.onclick = () => done(input === null ? true : inp.value);
+    cancel.onclick = () => done(input === null ? false : null);
+    m.onkeydown = e => { if (e.key === 'Escape') done(input === null ? false : null); };
+  });
+}
+
+// 차량 번호로 결과 찾기 (두 저장 방식 공용)
+function searchIn(data, q){
+  const n = normPlate(q); if (!n) return [];
+  const hit = v => normPlate(v.plate).includes(n);
+  const out = [];
+  data.families.forEach(f => { if (f.vehicles.some(hit)) f.students.forEach(s => out.push({ kind: 'student', family: f, student: s })); });
+  data.staff.forEach(s => { if (s.vehicles.some(hit)) out.push({ kind: 'staff', staff: s }); });
+  return out;
+}
+function findOwners(data, plate){
+  const n = normPlate(plate), names = [];
+  data.families.forEach(f => { if (f.vehicles.some(v => normPlate(v.plate) === n)) names.push(f.students.map(s => s.nameKo).join(', ')); });
+  data.staff.forEach(s => { if (s.vehicles.some(v => normPlate(v.plate) === n)) names.push(s.nameKo + '(교직원)'); });
+  return names;
+}
+
+/* =========================================================
+   데이터 저장소 ① 미리보기 모드 (브라우저 저장)
+   ========================================================= */
+const DB_KEY = 'hifs_vehicle_db_v1';
+const LocalApi = {
+  _db: null,
+  db(){
+    if (!this._db) {
+      try { const d = JSON.parse(localStorage.getItem(DB_KEY)); if (d && Array.isArray(d.families) && Array.isArray(d.staff)) this._db = d; } catch(e){}
+      this._db = this._db || { families: [], staff: [] };
+      if (!Array.isArray(this._db.admins) || !this._db.admins.length) this._db.admins = [
+        { id: 'A1', email: 'admin@hifs.example', name: '최고 관리자(예시)', role: 'super' },
+        { id: 'A2', email: 'staff@hifs.example', name: '일반 교직원(예시)', role: 'staff' },
+      ];
+    }
+    return this._db;
+  },
+  save(){ try { localStorage.setItem(DB_KEY, JSON.stringify(this._db)); } catch(e){} },
+  async loadClassOptions(){},
+  async registerFamily(f){
+    this.db().families.push({ id: uid('F'), memo: f.memo || '', source: f.source || 'self', contacts: f.contacts, vehicles: f.vehicles,
+      students: f.students.map(s => ({ ...s, id: uid('S') })) });
+    this.save();
+  },
+  async addStaff(s){ this.db().staff.push({ ...s, id: uid('T') }); this.save(); },
+  async listAll(){ return this.db(); },
+  async searchPlate(q){ return searchIn(this.db(), q); },
+  async updateMemo(kind, id, memo){
+    const db = this.db();
+    const t = kind === 'staff' ? db.staff.find(s => s.id === id) : db.families.find(f => f.id === id);
+    if (t) { t.memo = memo; this.save(); }
+  },
+  needSuper(msg){ if (!isSuper()) throw new Error(msg || '최고 관리자만 할 수 있습니다.'); },
+  async removeStudent(famId, stuId){
+    this.needSuper('삭제는 최고 관리자만 할 수 있습니다.');
+    const db = this.db(), f = db.families.find(x => x.id === famId); if (!f) return;
+    f.students = f.students.filter(s => s.id !== stuId);
+    if (!f.students.length) db.families = db.families.filter(x => x !== f);
+    this.save();
+  },
+  async removeStaff(id){ this.needSuper('삭제는 최고 관리자만 할 수 있습니다.'); const db = this.db(); db.staff = db.staff.filter(s => s.id !== id); this.save(); },
+  async importData({ families, staff }){
+    this.needSuper('CSV 업로드는 최고 관리자만 할 수 있습니다.');
+    for (const f of families) await this.registerFamily({ ...f, source: 'csv' });
+    for (const s of staff) await this.addStaff({ ...s, source: 'csv' });
+  },
+  findAdmin(email){ return this.db().admins.find(a => a.email.toLowerCase() === String(email || '').trim().toLowerCase()); },
+  async listAdmins(){
+    this.needSuper('최고 관리자만 볼 수 있습니다.');
+    return this.db().admins.map(a => ({ ...a })).sort((a, b) => (a.role === b.role ? 0 : a.role === 'super' ? -1 : 1));
+  },
+  async setAdmin(email, name, role){
+    this.needSuper('최고 관리자만 관리자를 지정할 수 있습니다.');
+    const list = this.db().admins.map(a => ({ ...a })), e = email.trim().toLowerCase();
+    const a = list.find(x => x.email.toLowerCase() === e);
+    if (a) { a.role = role; if (name.trim()) a.name = name.trim(); }
+    else list.push({ id: uid('A'), email: email.trim(), name: name.trim() || email.split('@')[0], role });
+    if (!list.some(x => x.role === 'super')) throw new Error('최고 관리자는 최소 1명 있어야 합니다.');
+    this.db().admins = list; this.save();
+  },
+  async removeAdmin(id){
+    this.needSuper('최고 관리자만 관리자를 뺄 수 있습니다.');
+    const list = this.db().admins.filter(a => a.id !== id);
+    if (!list.some(x => x.role === 'super')) throw new Error('최고 관리자는 최소 1명 있어야 합니다.');
+    this.db().admins = list; this.save();
+  },
+};
+
+/* =========================================================
+   데이터 저장소 ② Supabase (실제 운영)
+   ========================================================= */
+const FAMILY_COLS = 'id, memo, source, created_at, students(id, affiliation, name_ko, name_en, class_name, created_at), guardian_contacts(relation, phone, sort_order), vehicles(plate_number, owner_label, sort_order)';
+const STAFF_COLS  = 'id, name_ko, name_en, department, role, phone, memo, created_at, vehicles(plate_number, owner_label, sort_order)';
+const bySort = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
+const mapVehicles = vs => (vs || []).slice().sort(bySort).map(v => ({ plate: v.plate_number, owner: v.owner_label || '' }));
+const mapFamily = f => ({
+  id: f.id, memo: f.memo || '', source: f.source,
+  students: (f.students || []).slice().sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
+    .map(s => ({ id: s.id, affiliation: s.affiliation, nameKo: s.name_ko, nameEn: s.name_en, className: s.class_name })),
+  contacts: (f.guardian_contacts || []).slice().sort(bySort).map(c => ({ relation: c.relation, phone: c.phone })),
+  vehicles: mapVehicles(f.vehicles),
+});
+const mapStaff = s => ({ id: s.id, nameKo: s.name_ko, nameEn: s.name_en || '', dept: s.department, role: s.role || '', phone: s.phone, memo: s.memo || '', vehicles: mapVehicles(s.vehicles) });
+function must(res){ if (res.error) throw res.error; return res.data; }
+
+const SupabaseApi = {
+  async loadClassOptions(){
+    const { data, error } = await sb.from('class_options').select('affiliation, label').eq('is_active', true).order('sort_order');
+    if (error || !data || !data.length) return;
+    const m = {}; data.forEach(r => (m[r.affiliation] = m[r.affiliation] || []).push(r.label));
+    CONFIG.CLASS_OPTIONS = m;
+  },
+  async registerFamily(f){ must(await sb.rpc('register_family', { p: f })); },
+  async addStaff(s){ must(await sb.rpc('add_staff', { p: s })); },
+  async listAll(){
+    const [f, s] = await Promise.all([
+      sb.from('families').select(FAMILY_COLS).order('created_at', { ascending: false }),
+      sb.from('staff').select(STAFF_COLS).order('created_at', { ascending: false }),
+    ]);
+    return { families: must(f).map(mapFamily), staff: must(s).map(mapStaff) };
+  },
+  async searchPlate(q){
+    const n = normPlate(q).replace(/[%_\\]/g, ''); if (!n) return [];
+    const vs = must(await sb.from('vehicles').select('family_id, staff_id').ilike('plate_normalized', `%${n}%`).limit(50));
+    const fids = [...new Set(vs.map(v => v.family_id).filter(Boolean))];
+    const sids = [...new Set(vs.map(v => v.staff_id).filter(Boolean))];
+    const [f, s] = await Promise.all([
+      fids.length ? sb.from('families').select(FAMILY_COLS).in('id', fids) : Promise.resolve({ data: [] }),
+      sids.length ? sb.from('staff').select(STAFF_COLS).in('id', sids) : Promise.resolve({ data: [] }),
+    ]);
+    sb.from('audit_logs').insert({ action: 'search', detail: n }).then(() => {}, () => {});   // 조회 기록
+    return searchIn({ families: must(f).map(mapFamily), staff: must(s).map(mapStaff) }, q);
+  },
+  async updateMemo(kind, id, memo){ must(await sb.from(kind === 'staff' ? 'staff' : 'families').update({ memo: memo || null }).eq('id', id)); },
+  async removeStudent(famId, stuId){ must(await sb.from('students').delete().eq('id', stuId)); },  // 마지막 학생이면 가족도 DB에서 자동 삭제
+  async removeStaff(id){ must(await sb.from('staff').delete().eq('id', id)); },
+  async importData(rec){ return must(await sb.rpc('admin_import', { p: { families: rec.families, staff: rec.staff } })); },
+  async listAdmins(){ return must(await sb.rpc('list_admins')).map(a => ({ id: a.user_id, email: a.email, name: a.display_name, role: a.role })); },
+  async setAdmin(email, name, role){ must(await sb.rpc('set_admin', { p_email: email, p_name: name, p_role: role })); },
+  async removeAdmin(id){ must(await sb.rpc('remove_admin', { p_user_id: id })); },
+};
+
+const Api = USE_SUPABASE ? SupabaseApi : LocalApi;
+
+/* =========================================================
+   관리자 로그인
+   ========================================================= */
+let adminState = null;                 // { email, name, role: 'super' | 'staff' }
+let lastActive = Date.now();
+const isAdmin = () => !!adminState;
+const isSuper = () => !!adminState && adminState.role === 'super';
+
+const Lock = {
+  get(){ try { return JSON.parse(localStorage.getItem('hifs_login_lock')) || { fails: 0, until: 0 }; } catch(e){ return { fails: 0, until: 0 }; } },
+  set(v){ try { localStorage.setItem('hifs_login_lock', JSON.stringify(v)); } catch(e){} },
+};
+
+const DemoAuth = {
+  use(a){ adminState = a ? { email: a.email, name: a.name, role: a.role } : null; },
+  async restore(){ try { const s = JSON.parse(sessionStorage.getItem('hifs_demo_admin')); if (s && s.email) this.use(LocalApi.findAdmin(s.email)); } catch(e){} },
+  async login(email, pw){
+    const a = LocalApi.findAdmin(email);
+    if (a && pw === CONFIG.DEMO_PASSWORD) {
+      try { sessionStorage.setItem('hifs_demo_admin', JSON.stringify({ email: a.email })); } catch(e){}
+      this.use(a); return { ok: true };
+    }
+    return { ok: false };
+  },
+  async refresh(){ const a = adminState && LocalApi.findAdmin(adminState.email); if (a) this.use(a); else await this.logout(); },
+  async logout(){ try { sessionStorage.removeItem('hifs_demo_admin'); } catch(e){} adminState = null; },
+};
+
+const SbAuth = {
+  async restore(){
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) await this.finish(true);
+  },
+  async login(email, pw){
+    const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) return { ok: false };
+    return this.finish();
+  },
+  async finish(silent){
+    const { data: ok, error } = await sb.rpc('is_admin');
+    if (error || !ok) { await sb.auth.signOut(); return { ok: false, message: silent ? '' : '관리자로 등록되지 않은 계정입니다.' }; }
+    const { data: { user } } = await sb.auth.getUser();
+    const { data: me } = await sb.from('admins').select('display_name, role').eq('user_id', user.id).maybeSingle();
+    adminState = { email: user.email, name: (me && me.display_name) || '', role: (me && me.role) || 'staff' };
+    return { ok: true };
+  },
+  async refresh(){ const r = await this.finish(true); if (!r.ok) adminState = null; },
+  async logout(){ try { await sb.auth.signOut(); } catch(e){} adminState = null; },
+};
+const Auth = USE_SUPABASE ? SbAuth : DemoAuth;
+
+['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true }));
+setInterval(async () => {
+  if (isAdmin() && Date.now() - lastActive > CONFIG.IDLE_LOGOUT_MINUTES * 60000) {
+    await Auth.logout(); refreshAuthUI(); go('register');
+    toast('장시간 사용하지 않아 로그아웃되었습니다.');
+  }
+}, 30000);
+
+/* =========================================================
+   화면 전환
+   ========================================================= */
+let pendingTab = null;
+function go(tab){
+  if (tab === 'lookup' && !isAdmin()) { toast('차량 조회는 관리자 로그인 후 이용할 수 있습니다.'); pendingTab = 'lookup'; tab = 'admin'; }
+  if (tab === 'register') placeRegForm('register');
+  ['register', 'lookup', 'admin'].forEach(t => { $('#sec-' + t).hidden = t !== tab; });
+  $$('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'admin') renderAdmin();
+  if (tab === 'lookup') setTimeout(() => $('#plateQuery').focus(), 50);
+}
+$$('nav.tabs button').forEach(b => b.addEventListener('click', () => go(b.dataset.tab)));
+
+function refreshAuthUI(){
+  const admin = isAdmin();
+  $('#lookupLock').hidden = admin;
+  $('#regMemoWrap').hidden = !admin;
+  const showEntry = !CONFIG.HIDE_ADMIN_ENTRY || admin || location.hash === '#' + CONFIG.ADMIN_HASH;
+  $('#navLookup').hidden = !showEntry; $('#navAdmin').hidden = !showEntry;
+  $('nav.tabs').style.gridTemplateColumns = showEntry ? 'repeat(3,1fr)' : '1fr';
+}
+window.addEventListener('hashchange', () => { refreshAuthUI(); if (location.hash === '#' + CONFIG.ADMIN_HASH) go('admin'); });
+
+/* =========================================================
+   1) 차량 등록 폼
+   ========================================================= */
+function addStudentCard(){
+  const id = uid('c');
+  const card = document.createElement('div');
+  card.className = 'student-card';
+  card.innerHTML = `
+    <div class="card-head"><h3 class="stu-title"></h3><button type="button" class="link-btn danger remove-stu">삭제</button></div>
+    <div class="field"><label>소속 <em>*</em></label>
+      <div class="seg">${CONFIG.AFFILIATIONS.map(a => `<label class="seg-opt"><input type="radio" name="aff_${id}" value="${esc(a)}"><span>${esc(a)}</span></label>`).join('')}</div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>학생 한글 이름 <em>*</em></label><input class="nameKo" placeholder="예: 김힙스" autocomplete="off"></div>
+      <div class="field"><label>학생 영어 이름 <em>*</em></label><input class="nameEn" placeholder="예: Cathy" autocomplete="off"></div>
+    </div>
+    <div class="field"><label>반 <em>*</em></label><div class="class-slot"><input class="className" placeholder="소속을 먼저 선택해 주세요" disabled></div></div>`;
+  $$('input[type=radio]', card).forEach(r => r.addEventListener('change', () => renderClassSlot(card, r.value)));
+  card.querySelector('.remove-stu').addEventListener('click', () => { card.remove(); renumberStudents(); });
+  $('#studentList').appendChild(card);
+  renumberStudents();
+}
+function renderClassSlot(card, aff){
+  const slot = card.querySelector('.class-slot');
+  const opts = CONFIG.CLASS_OPTIONS[aff];
+  slot.innerHTML = opts && opts.length
+    ? `<select class="className"><option value="">반을 선택해 주세요</option>${opts.map(c => `<option>${esc(c)}</option>`).join('')}</select>`
+    : `<input class="className" placeholder="${esc(CONFIG.CLASS_PLACEHOLDER[aff] || '')}" autocomplete="off">`;
+}
+function renumberStudents(){
+  $$('#studentList .student-card').forEach((c, i) => {
+    c.querySelector('.stu-title').textContent = i === 0 ? '학생 정보' : `형제자매 ${i}`;
+    c.querySelector('.remove-stu').hidden = i === 0;
+  });
+}
+function addContactRow(container, relation = '', fixed = false){
+  const row = document.createElement('div');
+  row.className = 'row contact-row';
+  row.innerHTML = `<input class="rel" list="relList" placeholder="관계" value="${esc(relation)}" ${fixed ? 'readonly' : ''}>
+    <input class="phone" type="tel" inputmode="numeric" placeholder="예: 010-1234-5678">
+    <button type="button" class="icon-btn" title="삭제" ${fixed ? 'style="visibility:hidden"' : ''}>✕</button>`;
+  row.querySelector('.phone').addEventListener('input', e => e.target.value = fmtPhone(e.target.value));
+  row.querySelector('.icon-btn').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+function addVehicleRow(container){
+  const row = document.createElement('div');
+  row.className = 'row vehicle-row';
+  row.innerHTML = `<input class="plate" placeholder="예: 123가 4567" autocomplete="off">
+    <input class="owner" placeholder="예: 아빠 차">
+    <button type="button" class="icon-btn" title="삭제">✕</button>`;
+  row.querySelector('.plate').addEventListener('blur', e => { if (isPlate(e.target.value)) e.target.value = formatPlate(e.target.value); });
+  row.querySelector('.icon-btn').addEventListener('click', () => {
+    if ($$('.vehicle-row', container).length > 1) row.remove();
+    else { row.querySelector('.plate').value = ''; row.querySelector('.owner').value = ''; }
+  });
+  container.appendChild(row);
+}
+function collectVehicles(container, errors){
+  const list = [];
+  $$('.vehicle-row', container).forEach(r => {
+    const p = r.querySelector('.plate'), o = r.querySelector('.owner');
+    p.classList.remove('invalid');
+    if (!p.value.trim()) return;
+    if (!isPlate(p.value)) { p.classList.add('invalid'); errors.push(`차량 번호 형식을 확인해 주세요: ${p.value} (예: 123가 4567)`); return; }
+    list.push({ plate: formatPlate(p.value), owner: o.value.trim() });
+  });
+  if (!list.length && !errors.some(e => e.startsWith('차량'))) {
+    errors.push('차량 번호를 1대 이상 입력해 주세요.');
+    const first = container.querySelector('.plate'); if (first) first.classList.add('invalid');
+  }
+  return list;
+}
+function resetRegisterForm(){
+  $('#regForm').reset();
+  $('#studentList').innerHTML = ''; $('#contactList').innerHTML = ''; $('#vehicleList').innerHTML = '';
+  addStudentCard();
+  addContactRow($('#contactList'), '부', true);
+  addContactRow($('#contactList'), '모', true);
+  addVehicleRow($('#vehicleList'));
+  $('#regErrors').hidden = true;
+}
+$('#addStudentBtn').addEventListener('click', addStudentCard);
+$('#addContactBtn').addEventListener('click', () => addContactRow($('#contactList')));
+$('#addVehicleBtn').addEventListener('click', () => addVehicleRow($('#vehicleList')));
+
+function showErrors(box, errors){ box.innerHTML = errors.map(esc).join('<br>'); box.hidden = false; }
+
+$('#regForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const errors = [];
+  $$('#regForm .invalid').forEach(el => el.classList.remove('invalid'));
+
+  const students = $$('#studentList .student-card').map((card, i) => {
+    const label = i === 0 ? '학생' : `형제자매 ${i}`;
+    const aff = card.querySelector('input[type=radio]:checked')?.value || '';
+    const nameKo = card.querySelector('.nameKo'), nameEn = card.querySelector('.nameEn'), cls = card.querySelector('.className');
+    if (!aff) { errors.push(`${label}: 소속을 선택해 주세요.`); card.querySelector('.seg').classList.add('invalid'); }
+    if (!nameKo.value.trim()) { errors.push(`${label}: 한글 이름을 입력해 주세요.`); nameKo.classList.add('invalid'); }
+    if (!nameEn.value.trim()) { errors.push(`${label}: 영어 이름을 입력해 주세요.`); nameEn.classList.add('invalid'); }
+    if (aff && !cls.value.trim()) { errors.push(`${label}: 반을 입력해 주세요.`); cls.classList.add('invalid'); }
+    return { affiliation: aff, nameKo: nameKo.value.trim(), nameEn: nameEn.value.trim(), className: cls.value.trim() };
+  });
+
+  const contacts = [];
+  $$('#contactList .contact-row').forEach(r => {
+    const rel = r.querySelector('.rel'), ph = r.querySelector('.phone');
+    if (!ph.value.trim()) return;
+    if (!PHONE_RE.test(ph.value)) { errors.push(`연락처 형식을 확인해 주세요: ${ph.value}`); ph.classList.add('invalid'); return; }
+    contacts.push({ relation: rel.value.trim() || '기타', phone: ph.value });
+  });
+  if (!contacts.length) { errors.push('학부모 연락처를 1개 이상 입력해 주세요.'); $('#contactList .phone').classList.add('invalid'); }
+
+  const vehicles = collectVehicles($('#vehicleList'), errors);
+  const consent = $('#consent').checked;
+  if (!consent) errors.push('개인정보 수집·이용에 동의해 주세요.');
+
+  if (errors.length) {
+    showErrors($('#regErrors'), errors);
+    ($('#regForm .invalid') || $('#regErrors')).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  $('#regErrors').hidden = true;
+
+  // 중복 차량 확인 (관리자만 — 일반 방문자는 다른 가족 정보를 볼 수 없음)
+  if (isAdmin()) {
+    try {
+      const data = await Api.listAll();
+      for (const v of vehicles) {
+        const owners = findOwners(data, v.plate);
+        if (owners.length && !(await ask({ title: '이미 등록된 차량입니다', message: `${v.plate} 차량은 ${owners.join(' / ')} 가족으로 이미 등록되어 있습니다. 그래도 등록할까요?`, okText: '등록' }))) return;
+      }
+    } catch(err){}
+  }
+
+  const btn = $('#regSubmit'); btn.disabled = true; btn.textContent = '등록 중...';
+  try {
+    await Api.registerFamily({ students, contacts, vehicles, consent,
+      memo: isAdmin() ? $('#regMemo').value.trim() : '', source: isAdmin() ? 'admin' : 'self' });
+  } catch(err) {
+    showErrors($('#regErrors'), ['등록하지 못했습니다: ' + errMsg(err)]);
+    return;
+  } finally { btn.disabled = false; btn.textContent = '등록하기'; }
+
+  $('#regDoneSummary').innerHTML = `${students.map(s => esc(`${s.nameKo}(${s.nameEn}) · ${s.affiliation} ${s.className}`)).join('<br>')}<br>차량 ${vehicles.length}대: ${vehicles.map(v => esc(v.plate)).join(', ')}`;
+  $('#regForm').hidden = true; $('#regDone').hidden = false;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+$('#regAgainBtn').addEventListener('click', () => { resetRegisterForm(); $('#regDone').hidden = true; $('#regForm').hidden = false; });
+
+/* =========================================================
+   2) 차량 조회
+   ========================================================= */
+async function doSearch(){
+  if (!isAdmin()) return go('lookup');
+  const q = $('#plateQuery').value.trim();
+  const box = $('#results');
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<p class="muted">조회 중...</p>';
+  try {
+    const res = await Api.searchPlate(q);
+    box.innerHTML = res.length
+      ? `<p class="muted">검색 결과 ${res.length}건</p>` + res.map(r => resultCard(r, q)).join('')
+      : `<div class="card"><b>등록되지 않은 차량입니다.</b><p class="muted">번호를 다시 확인하거나 뒷자리 4자리로 검색해 보세요.</p></div>`;
+  } catch(err) { box.innerHTML = `<div class="error-box">조회하지 못했습니다: ${esc(errMsg(err))}</div>`; }
+}
+function platesHTML(vs, q){
+  const n = normPlate(q);
+  return vs.map(v => `<span class="plate ${n && normPlate(v.plate).includes(n) ? 'hit' : ''}">${esc(v.plate)}</span>${v.owner ? ` <small class="muted">(${esc(v.owner)})</small>` : ''}`).join('<br>');
+}
+function resultCard(r, q){
+  if (r.kind === 'staff') {
+    const s = r.staff;
+    return `<div class="card result staff"><span class="badge staff">교직원</span><dl>
+      <dt>소속</dt><dd>교직원 · ${esc(s.dept)}${s.role ? ' / ' + esc(s.role) : ''}</dd>
+      <dt>한글 이름</dt><dd>${esc(s.nameKo)}</dd>
+      <dt>영어 이름</dt><dd>${esc(s.nameEn) || '-'}</dd>
+      <dt>연락처</dt><dd><a href="tel:${esc(s.phone)}">${esc(s.phone)}</a></dd>
+      <dt>차량 번호</dt><dd>${platesHTML(s.vehicles, q)}</dd>
+      ${s.memo ? `<dt>메모</dt><dd>${esc(s.memo)}</dd>` : ''}
+    </dl></div>`;
+  }
+  const f = r.family, s = r.student;
+  const sibs = f.students.filter(x => x.id !== s.id);
+  return `<div class="card result"><span class="badge">${esc(s.affiliation)}</span><dl>
+    <dt>소속</dt><dd>${esc(s.affiliation)}</dd>
+    <dt>한글 이름</dt><dd>${esc(s.nameKo)}</dd>
+    <dt>영어 이름</dt><dd>${esc(s.nameEn)}</dd>
+    <dt>반</dt><dd>${esc(s.className)}</dd>
+    <dt>학부모 연락처</dt><dd>${f.contacts.map(c => `${esc(c.relation)} <a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>`).join('<br>')}</dd>
+    <dt>차량 번호</dt><dd>${platesHTML(f.vehicles, q)}</dd>
+    ${sibs.length ? `<dt>형제자매</dt><dd>${sibs.map(x => esc(`${x.nameKo}(${x.nameEn}) · ${x.affiliation} ${x.className}`)).join('<br>')}</dd>` : ''}
+    ${f.memo ? `<dt>메모</dt><dd>${esc(f.memo)}</dd>` : ''}
+  </dl></div>`;
+}
+$('#searchBtn').addEventListener('click', doSearch);
+$('#plateQuery').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+/* 사진으로 번호판 인식 (브라우저 OCR — 정확도 한계 있음, 인식 결과는 직접 확인) */
+async function runOCR(file){
+  if (!file) return;
+  $('#ocrBox').hidden = false;
+  $('#ocrPreview').src = URL.createObjectURL(file);
+  const status = $('#ocrStatus');
+  status.textContent = '번호판을 인식하는 중입니다... (처음에는 10초 정도 걸릴 수 있어요)';
+  try {
+    if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+    const { data: { text } } = await Tesseract.recognize(file, 'kor');
+    const cleaned = text.replace(/[^0-9가-힣]/g, '');
+    const m = cleaned.match(/(\d{2,3})([가-힣])(\d{4})/);
+    if (m) {
+      $('#plateQuery').value = `${m[1]}${m[2]} ${m[3]}`;
+      status.textContent = `인식 결과: ${m[1]}${m[2]} ${m[3]} — 다르면 직접 수정 후 조회를 눌러 주세요.`;
+      doSearch();
+    } else {
+      const d = cleaned.match(/\d{4}/g);
+      if (d) { $('#plateQuery').value = d[d.length - 1]; status.textContent = `전체 번호를 인식하지 못해 뒷자리(${d[d.length - 1]})로 검색했습니다. 확인해 주세요.`; doSearch(); }
+      else status.textContent = '번호판을 인식하지 못했습니다. 번호판이 크게 보이도록 다시 찍거나 직접 입력해 주세요.';
+    }
+  } catch (err) { status.textContent = '사진 인식 기능을 불러오지 못했습니다. 차량 번호를 직접 입력해 주세요.'; }
+}
+$('#camInput').addEventListener('change', e => { runOCR(e.target.files[0]); e.target.value = ''; });
+$('#fileInput').addEventListener('change', e => { runOCR(e.target.files[0]); e.target.value = ''; });
+
+/* =========================================================
+   3) 관리자
+   ========================================================= */
+let adminFilter = '전체';
+let adminData = { families: [], staff: [] };
+
+function renderAdmin(){
+  const admin = isAdmin();
+  $('#loginBox').hidden = admin; $('#adminPanel').hidden = !admin;
+  if (admin) {
+    $('#adminWho').textContent = (adminState.name ? adminState.name + ' · ' : '') + adminState.email;
+    $('#adminRole').textContent = isSuper() ? '최고 관리자' : '일반 관리자';
+    $('#adminRole').classList.toggle('super', isSuper());
+    $$('.super-only').forEach(el => { el.hidden = !isSuper(); });
+    showSub(currentSub);
+  }
+  else showLockMsg();
+}
+async function reloadAdmin(){
+  try { adminData = await Api.listAll(); } catch(err) { toast('목록을 불러오지 못했습니다: ' + errMsg(err)); }
+  renderAdminList();
+}
+function showLockMsg(){
+  const L = Lock.get(), msg = $('#loginMsg');
+  if (L.until > Date.now()) { msg.hidden = false; msg.textContent = `로그인 시도가 너무 많아 ${Math.ceil((L.until - Date.now()) / 60000)}분 동안 잠겼습니다.`; return true; }
+  msg.hidden = true; return false;
+}
+function loginFailed(message){
+  const L = Lock.get(), fails = L.fails + 1, msg = $('#loginMsg');
+  Lock.set(fails >= CONFIG.MAX_LOGIN_FAIL ? { fails: 0, until: Date.now() + CONFIG.LOCK_MINUTES * 60000 } : { fails, until: 0 });
+  msg.hidden = false;
+  msg.textContent = fails >= CONFIG.MAX_LOGIN_FAIL
+    ? `로그인 ${CONFIG.MAX_LOGIN_FAIL}회 실패로 ${CONFIG.LOCK_MINUTES}분간 잠겼습니다.`
+    : `${message || '이메일 또는 비밀번호가 올바르지 않습니다.'} (${fails}/${CONFIG.MAX_LOGIN_FAIL})`;
+}
+function resetLoginSteps(){
+  $('#loginPw').value = '';
+}
+function onLoggedIn(){
+  Lock.set({ fails: 0, until: 0 });
+  resetLoginSteps(); refreshAuthUI();
+  const t = pendingTab || 'admin'; pendingTab = null; go(t);
+}
+
+$('#pwStep').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (showLockMsg()) return;
+  const email = $('#loginEmail').value.trim(), pw = $('#loginPw').value;
+  if (!email || !pw) { loginFailed('이메일과 비밀번호를 입력해 주세요.'); return; }
+  const btn = $('#loginBtn'); btn.disabled = true;
+  let res;
+  try { res = await Auth.login(email, pw); } catch(err) { res = { ok: false, message: '로그인 중 오류가 발생했습니다.' }; }
+  btn.disabled = false;
+  if (res.ok) return onLoggedIn();
+  loginFailed(res.message);
+});
+$('#logoutBtn').addEventListener('click', async () => { await Auth.logout(); refreshAuthUI(); go('register'); });
+
+$$('.subtabs button').forEach(b => b.addEventListener('click', () => {
+    showSub(b.dataset.sub);
+}));
+// 학생 등록 폼은 하나만 두고, 관리자 '학생 등록' 탭과 '차량 등록' 화면 사이를 옮겨 다닙니다.
+function placeRegForm(where){
+  const host = where === 'admin' ? $('#sub-student') : $('#sec-register');
+  if ($('#regForm').parentElement !== host) {
+    host.appendChild($('#regForm')); host.appendChild($('#regDone'));
+    if (!$('#regDone').hidden) { resetRegisterForm(); $('#regDone').hidden = true; $('#regForm').hidden = false; }
+  }
+}
+let currentSub = 'list';
+function showSub(sub){
+  if (!isSuper() && (sub === 'csv' || sub === 'admins')) sub = 'list';
+  currentSub = sub;
+  $$('.subtabs button').forEach(x => x.classList.toggle('active', x.dataset.sub === sub));
+  $('#sub-list').hidden = sub !== 'list';
+  $('#sub-student').hidden = sub !== 'student';
+  $('#staffForm').hidden = sub !== 'staff';
+  $('#sub-csv').hidden = sub !== 'csv';
+  $('#sub-admins').hidden = sub !== 'admins';
+  placeRegForm(sub === 'student' ? 'admin' : 'register');
+  if (sub === 'student') { $('#regDone').hidden = true; $('#regForm').hidden = false; }
+  if (sub === 'list') reloadAdmin();
+  if (sub === 'admins') loadAdmins();
+}
+
+function allRows(){
+  const rows = [];
+  adminData.families.forEach(f => f.students.forEach(s => rows.push({
+    kind: 'student', id: s.id, famId: f.id, aff: s.affiliation, nameKo: s.nameKo, nameEn: s.nameEn, cls: s.className,
+    contacts: f.contacts.map(c => `${c.relation} ${c.phone}`), vehicles: f.vehicles,
+    sibs: f.students.filter(x => x.id !== s.id).map(x => x.nameKo), memo: f.memo || '',
+  })));
+  adminData.staff.forEach(s => rows.push({
+    kind: 'staff', id: s.id, aff: '교직원', nameKo: s.nameKo, nameEn: s.nameEn, cls: [s.dept, s.role].filter(Boolean).join(' / '),
+    contacts: [s.phone], vehicles: s.vehicles, sibs: [], memo: s.memo || '',
+  }));
+  return rows;
+}
+function renderAdminList(){
+  const rows = allRows();
+  const filters = ['전체', ...CONFIG.AFFILIATIONS, '교직원'];
+  $('#filterChips').innerHTML = filters.map(f => {
+    const n = f === '전체' ? rows.length : rows.filter(r => r.aff === f).length;
+    return `<button type="button" data-f="${esc(f)}" class="${f === adminFilter ? 'active' : ''}">${esc(f)} ${n}</button>`;
+  }).join('');
+  $$('#filterChips button').forEach(b => b.addEventListener('click', () => { adminFilter = b.dataset.f; renderAdminList(); }));
+
+  const q = $('#adminSearch').value.trim().toLowerCase(), qn = normPlate(q);
+  const list = rows.filter(r => (adminFilter === '전체' || r.aff === adminFilter) && (!q ||
+    [r.nameKo, r.nameEn, r.cls, r.memo, ...r.contacts].join(' ').toLowerCase().includes(q) ||
+    r.vehicles.some(v => normPlate(v.plate).includes(qn))));
+
+  $('#adminRows').innerHTML = list.length ? list.map(r => `<tr>
+    <td>${esc(r.aff)}</td>
+    <td><b>${esc(r.nameKo)}</b><br><span class="muted">${esc(r.nameEn)}</span></td>
+    <td>${esc(r.cls)}</td>
+    <td class="nowrap">${r.contacts.map(esc).join('<br>')}</td>
+    <td>${r.vehicles.map(v => `<span class="plate">${esc(v.plate)}</span>${v.owner ? ` <small class="muted">(${esc(v.owner)})</small>` : ''}`).join('<br>')}</td>
+    <td>${r.sibs.map(esc).join(', ') || '-'}</td>
+    <td>${esc(r.memo) || '-'}</td>
+    <td style="white-space:nowrap"><button class="link-btn" data-act="memo" data-kind="${r.kind}" data-id="${esc(r.kind === 'staff' ? r.id : r.famId)}">메모</button>
+        ${isSuper() ? `<button class="link-btn danger" data-act="del" data-kind="${r.kind}" data-id="${esc(r.id)}" data-fam="${esc(r.famId || '')}">삭제</button>` : ''}</td>
+  </tr>`).join('') : `<tr><td colspan="8" class="muted" style="text-align:center;padding:24px">등록된 정보가 없습니다.</td></tr>`;
+
+  $$('#adminRows button').forEach(b => b.addEventListener('click', async () => {
+    try {
+      if (b.dataset.act === 'memo') {
+        const cur = b.dataset.kind === 'staff' ? adminData.staff.find(s => s.id === b.dataset.id)?.memo : adminData.families.find(f => f.id === b.dataset.id)?.memo;
+        const memo = await ask({ title: b.dataset.kind === 'staff' ? '메모 (특이사항)' : '메모 (형제자매 공통 · 특이사항)', input: cur || '', okText: '저장' });
+        if (memo === null) return;
+        await Api.updateMemo(b.dataset.kind, b.dataset.id, memo.trim());
+      } else {
+        if (!(await ask({ title: '삭제할까요?', message: '삭제하면 되돌릴 수 없습니다.', okText: '삭제', danger: true }))) return;
+        if (b.dataset.kind === 'staff') await Api.removeStaff(b.dataset.id); else await Api.removeStudent(b.dataset.fam, b.dataset.id);
+      }
+      await reloadAdmin();
+    } catch(err) { toast('처리하지 못했습니다: ' + errMsg(err)); }
+  }));
+}
+$('#adminSearch').addEventListener('input', renderAdminList);
+
+/* 관리자 관리 (최고 관리자만) */
+async function loadAdmins(){
+  const tb = $('#adminList');
+  try {
+    const list = await Api.listAdmins();
+    tb.innerHTML = list.map(a => {
+      const me = a.email.toLowerCase() === adminState.email.toLowerCase();
+      return `<tr>
+        <td><b>${esc(a.name)}</b>${me ? ' <span class="muted">(나)</span>' : ''}</td>
+        <td>${esc(a.email)}</td>
+        <td><select class="role-select" data-email="${esc(a.email)}" data-name="${esc(a.name)}" data-me="${me ? 1 : 0}" aria-label="${esc(a.name)} 권한">
+          <option value="staff" ${a.role === 'staff' ? 'selected' : ''}>일반 관리자</option>
+          <option value="super" ${a.role === 'super' ? 'selected' : ''}>최고 관리자</option></select></td>
+        <td>${me ? '<span class="muted">-</span>' : `<button type="button" class="link-btn danger" data-rm="${esc(a.id)}" data-name="${esc(a.name)}">관리자에서 빼기</button>`}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" class="muted">관리자가 없습니다.</td></tr>';
+
+    $$('#adminList .role-select').forEach(sel => sel.addEventListener('change', async () => {
+      const me = sel.dataset.me === '1';
+      if (me && sel.value === 'staff' && !(await ask({ title: '내 권한을 일반 관리자로 바꿀까요?', message: '바꾸면 삭제, CSV 업로드, 관리자 관리를 더 이상 할 수 없습니다.', okText: '바꾸기', danger: true }))) { loadAdmins(); return; }
+      try {
+        await Api.setAdmin(sel.dataset.email, sel.dataset.name, sel.value);
+        toast(`${sel.dataset.name} 님을 ${sel.value === 'super' ? '최고 관리자' : '일반 관리자'}로 바꿨습니다.`);
+        if (me) { await Auth.refresh(); refreshAuthUI(); if (isAdmin()) renderAdmin(); else go('register'); }
+        else loadAdmins();
+      } catch(err) { toast(errMsg(err)); loadAdmins(); }
+    }));
+    $$('#adminList [data-rm]').forEach(btn => btn.addEventListener('click', async () => {
+      if (!(await ask({ title: `${btn.dataset.name} 님을 관리자에서 뺄까요?`, message: '계정은 남고, 이 사람은 더 이상 관리자 화면에 로그인할 수 없습니다.', okText: '빼기', danger: true }))) return;
+      try { await Api.removeAdmin(btn.dataset.rm); toast('관리자에서 뺐습니다.'); loadAdmins(); }
+      catch(err) { toast(errMsg(err)); }
+    }));
+  } catch(err) {
+    tb.innerHTML = `<tr><td colspan="4"><div class="error-box" style="margin:0">목록을 불러오지 못했습니다: ${esc(errMsg(err))}</div></td></tr>`;
+  }
+}
+$('#adminAddForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('#admEmail').value.trim(), name = $('#admName').value.trim(), role = $('#admRole').value;
+  $('#admEmail').classList.remove('invalid');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $('#admEmail').classList.add('invalid'); showErrors($('#adminAddErrors'), ['이메일을 정확히 입력해 주세요.']); return; }
+  try { await Api.setAdmin(email, name, role); }
+  catch(err) { showErrors($('#adminAddErrors'), [errMsg(err)]); return; }
+  $('#adminAddErrors').hidden = true; $('#adminAddForm').reset();
+  toast(`${name || email} 님을 ${role === 'super' ? '최고 관리자' : '일반 관리자'}로 추가했습니다.`);
+  loadAdmins();
+});
+
+/* 교직원 등록 (관리자만) */
+$('#stPhone').addEventListener('input', e => e.target.value = fmtPhone(e.target.value));
+$('#stAddVehicleBtn').addEventListener('click', () => addVehicleRow($('#stVehicleList')));
+$('#staffForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!isAdmin()) return go('admin');
+  const errors = [];
+  $$('#staffForm .invalid').forEach(el => el.classList.remove('invalid'));
+  const need = (sel, msg) => { const el = $(sel); if (!el.value.trim()) { errors.push(msg); el.classList.add('invalid'); } return el.value.trim(); };
+  const nameKo = need('#stNameKo', '한글 이름을 입력해 주세요.');
+  const dept = need('#stDept', '부서를 입력해 주세요.');
+  const phone = need('#stPhone', '연락처를 입력해 주세요.');
+  if (phone && !PHONE_RE.test(phone)) { errors.push('연락처 형식을 확인해 주세요.'); $('#stPhone').classList.add('invalid'); }
+  const vehicles = collectVehicles($('#stVehicleList'), errors);
+  if (errors.length) return showErrors($('#staffErrors'), errors);
+  $('#staffErrors').hidden = true;
+  try {
+    await Api.addStaff({ nameKo, nameEn: $('#stNameEn').value.trim(), dept, role: $('#stRole').value.trim(), phone, vehicles, memo: $('#stMemo').value.trim(), source: 'admin' });
+  } catch(err) { return showErrors($('#staffErrors'), ['등록하지 못했습니다: ' + errMsg(err)]); }
+  toast(`${nameKo} 교직원이 등록되었습니다.`);
+  $('#staffForm').reset(); $('#stVehicleList').innerHTML = ''; addVehicleRow($('#stVehicleList'));
+});
+
+/* CSV 업로드 */
+const CSV_HEADERS = ['구분', '소속', '한글이름', '영어이름', '반/부서', '담당', '연락처', '차량번호', '형제그룹', '메모'];
+$('#csvTemplateBtn').addEventListener('click', () => {
+  const rows = [CSV_HEADERS,
+    ['학생', 'HIFS 유치부', '김힙스', 'Cathy', 'Secret Garden', '', '부:010-1234-5678|모:010-2345-6789', '123가 4567(아빠)|45나 6789(엄마)', 'F001', ''],
+    ['학생', 'HIFS Global', '김하늘', 'Sky', '1학년 1반', '', '부:010-1234-5678|모:010-2345-6789', '123가 4567(아빠)|45나 6789(엄마)', 'F001', ''],
+    ['학생', 'HIFS English', '이영어', 'Emma', '월수금 1부', '', '모:010-5555-6666|할머니:010-7777-8888', '67다 1234(할머니 차)', '', '할머니 픽업'],
+    ['교직원', '', '박선생', 'Jane', '교무부', '1학년 담임', '010-9876-5432', '12라 3456', '', ''],
+  ];
+  const csv = '﻿' + rows.map(r => r.map(c => /[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'HIFS_차량등록_양식.csv'; a.click();
+});
+function parseCSV(text){
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+async function readCsvFile(file){
+  const buf = await file.arrayBuffer();
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('\uFFFD')) { try { text = new TextDecoder('euc-kr').decode(buf); } catch(e){} } // 엑셀 기본 저장(CP949) 대응
+  return text.replace(/^﻿/, '');
+}
+const normAff = v => CONFIG.AFFILIATIONS.find(a => a === v || a.replace('HIFS ', '') === v.replace('HIFS ', '').trim()) || '';
+function parseContacts(s){ return s.split('|').map(t => t.trim()).filter(Boolean).map(t => { const m = t.match(/^(.+?)\s*:\s*(.+)$/); return { relation: m ? m[1].trim() : '기타', phone: fmtPhone(m ? m[2] : t) }; }); }
+function parseVehicles(s){ return s.split('|').map(t => t.trim()).filter(Boolean).map(t => { const m = t.match(/^(.*?)\s*\((.*)\)\s*$/); return { plate: formatPlate(m ? m[1] : t), owner: m ? m[2].trim() : '' }; }); }
+function csvToRecords(rows){
+  if (!rows.length) return { families: [], staff: [], errors: ['빈 파일입니다.'] };
+  const header = rows[0].map(h => h.trim());
+  const missing = CSV_HEADERS.filter(h => !header.includes(h));
+  if (missing.length) return { families: [], staff: [], errors: [`필수 열이 없습니다: ${missing.join(', ')} (양식을 다운로드해 사용해 주세요)`] };
+  const idx = Object.fromEntries(CSV_HEADERS.map(h => [h, header.indexOf(h)]));
+  const errors = [], staff = [], groups = new Map(), solo = [];
+  rows.slice(1).forEach((r, i) => {
+    if (r.every(c => !String(c).trim())) return;
+    const line = i + 2, g = k => String(r[idx[k]] ?? '').trim();
+    const vehicles = parseVehicles(g('차량번호'));
+    const contacts = parseContacts(g('연락처'));
+    vehicles.filter(v => !isPlate(v.plate)).forEach(v => errors.push(`${line}행: 차량 번호 형식 오류 (${v.plate})`));
+    contacts.filter(c => !PHONE_RE.test(c.phone)).forEach(c => errors.push(`${line}행: 연락처 형식 오류 (${c.phone})`));
+    if (!vehicles.length) errors.push(`${line}행: 차량 번호가 없습니다.`);
+    if (!contacts.length) errors.push(`${line}행: 연락처가 없습니다.`);
+    if (!g('한글이름')) errors.push(`${line}행: 한글이름이 없습니다.`);
+    if (g('구분') === '교직원') {
+      if (!g('반/부서')) errors.push(`${line}행: 교직원의 부서(반/부서 열)가 없습니다.`);
+      staff.push({ nameKo: g('한글이름'), nameEn: g('영어이름'), dept: g('반/부서'), role: g('담당'), phone: contacts[0]?.phone || '', vehicles, memo: g('메모') });
+    } else if (g('구분') === '학생') {
+      const aff = normAff(g('소속'));
+      if (!aff) errors.push(`${line}행: 소속 오류 (${g('소속')})`);
+      if (!g('영어이름')) errors.push(`${line}행: 영어이름이 없습니다.`);
+      if (!g('반/부서')) errors.push(`${line}행: 반이 없습니다.`);
+      const stu = { affiliation: aff, nameKo: g('한글이름'), nameEn: g('영어이름'), className: g('반/부서') };
+      const key = g('형제그룹');
+      let fam = key ? groups.get(key) : null;
+      if (!fam) { fam = { students: [], contacts: [], vehicles: [], memo: '' }; key ? groups.set(key, fam) : solo.push(fam); }
+      fam.students.push(stu);
+      contacts.forEach(c => { if (!fam.contacts.some(x => x.phone === c.phone)) fam.contacts.push(c); });
+      vehicles.forEach(v => { if (!fam.vehicles.some(x => normPlate(x.plate) === normPlate(v.plate))) fam.vehicles.push(v); });
+      if (g('메모')) fam.memo = [fam.memo, g('메모')].filter(Boolean).join(' / ');
+    } else errors.push(`${line}행: 구분은 '학생' 또는 '교직원'이어야 합니다.`);
+  });
+  return { families: [...groups.values(), ...solo], staff, errors };
+}
+$('#csvInput').addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  const rec = csvToRecords(parseCSV(await readCsvFile(file)));
+  const nStu = rec.families.reduce((a, f) => a + f.students.length, 0);
+  const box = $('#csvPreview');
+  box.innerHTML = `<div class="notice">학생 <b>${nStu}</b>명 (가족 ${rec.families.length}개) · 교직원 <b>${rec.staff.length}</b>명을 읽었습니다.</div>
+    ${rec.errors.length ? `<div class="error-box"><b>확인이 필요한 행 ${rec.errors.length}건</b><br>${rec.errors.slice(0, 30).map(esc).join('<br>')}${rec.errors.length > 30 ? '<br>…' : ''}</div>` : ''}
+    <button type="button" class="btn primary" id="csvApplyBtn" ${rec.errors.length || !(nStu + rec.staff.length) ? 'disabled' : ''}>반영하기</button>
+    ${rec.errors.length ? '<p class="muted">오류를 수정한 뒤 다시 업로드해 주세요.</p>' : ''}`;
+  const btn = $('#csvApplyBtn');
+  if (btn) btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = '반영 중...';
+    try { await Api.importData(rec); }
+    catch(err) { btn.disabled = false; btn.textContent = '반영하기'; toast('반영하지 못했습니다: ' + errMsg(err)); return; }
+    box.innerHTML = '<div class="notice">반영이 완료되었습니다.</div>'; toast('CSV 데이터가 반영되었습니다.');
+  });
+});
+
+/* =========================================================
+   시작
+   ========================================================= */
+resetRegisterForm();
+addVehicleRow($('#stVehicleList'));
+refreshAuthUI();
+go(location.hash === '#' + CONFIG.ADMIN_HASH ? 'admin' : 'register');
+
+(async function init(){
+  if (USE_SUPABASE) {
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
+      sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+        auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true }, // 브라우저를 닫으면 로그아웃
+      });
+      await Api.loadClassOptions();
+      await Auth.restore();
+    } catch(err) { toast('서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.'); }
+  } else {
+    $('#demoBanner').hidden = false; $('#demoCreds').hidden = false;
+    $('#adminAddHelp').textContent = '미리보기에서는 추가한 이메일과 비밀번호 hifs1234! 로 바로 로그인해 볼 수 있습니다.';
+    await Auth.restore();
+  }
+  refreshAuthUI();
+  if (isAdmin() && !$('#sec-admin').hidden) renderAdmin();
+})();
+</script>
+</body>
+</html>
