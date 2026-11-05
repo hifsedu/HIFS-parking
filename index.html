@@ -346,7 +346,7 @@
 const CONFIG = {
   // ▼ Supabase 대시보드 > Project Settings > API 에서 복사
   //   비워 두면 '미리보기 모드'(이 브라우저에만 저장)로 동작합니다.
-  SUPABASE_URL: 'https://vmphycxdewdgtudoboun.supabase.co/rest/v1/',        // 예: 'https://abcdefgh.supabase.co'
+  SUPABASE_URL: 'https://vmphycxdewdgtudoboun.supabase.co',        // 예: 'https://abcdefgh.supabase.co'
   SUPABASE_ANON_KEY: 'sb_publishable_fDv9jsGnumYp8hnH9WLXrg_qc6aDkzd',   // 'anon public' 또는 'publishable' 키 (공개돼도 되는 키). ⚠ service_role / secret 키는 절대 넣지 마세요.
 
   AFFILIATIONS: ['HIFS 유치부', 'HIFS Global', 'HIFS English'],
@@ -1172,7 +1172,9 @@ go(location.hash === '#' + CONFIG.ADMIN_HASH ? 'admin' : 'register');
   if (USE_SUPABASE) {
     try {
       await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
-      sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+      // 주소 끝에 /rest/v1/ 등이 붙어 있어도 프로젝트 주소만 쓰도록 정리
+      const baseUrl = CONFIG.SUPABASE_URL.trim().replace(/\/(rest|auth)\/v1\/?$/, '').replace(/\/+$/, '');
+      sb = window.supabase.createClient(baseUrl, CONFIG.SUPABASE_ANON_KEY.trim(), {
         auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true }, // 브라우저를 닫으면 로그아웃
       });
       await Api.loadClassOptions();
