@@ -128,6 +128,7 @@
   .role-pill.super{background:var(--navy);color:var(--on-navy)}
   table.admins-table{min-width:520px}
   .role-select{width:auto;padding:6px 8px;font-size:.9rem}
+  .admin-actions{display:flex;gap:8px;flex-wrap:wrap}
   .admin-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;font-size:.92rem;flex-wrap:wrap}
   .subtabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
   .subtabs button{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font-family:inherit;font-size:.92rem}
@@ -253,8 +254,22 @@
     <div id="adminPanel" hidden>
       <div class="admin-bar">
         <span>관리자: <b id="adminWho"></b><span id="adminRole" class="role-pill"></span></span>
-        <button type="button" class="btn" id="logoutBtn">로그아웃</button>
+        <div class="admin-actions">
+          <button type="button" class="btn" id="pwChangeBtn">비밀번호 변경</button>
+          <button type="button" class="btn" id="logoutBtn">로그아웃</button>
+        </div>
       </div>
+
+      <form id="pwChangeForm" class="card" hidden novalidate>
+        <h2>비밀번호 변경</h2>
+        <div class="field"><label for="pwCur">현재 비밀번호</label><input type="password" id="pwCur" autocomplete="current-password"></div>
+        <div class="grid2">
+          <div class="field"><label for="pwNew">새 비밀번호</label><input type="password" id="pwNew" autocomplete="new-password" placeholder="8자 이상, 영문·숫자 함께"></div>
+          <div class="field"><label for="pwNew2">새 비밀번호 확인</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+        </div>
+        <div id="pwErrors" class="error-box" hidden></div>
+        <div class="admin-actions" style="justify-content:flex-end"><button type="button" class="btn" id="pwCancel">취소</button><button type="submit" class="btn primary" id="pwSubmit">변경</button></div>
+      </form>
       <div class="subtabs">
         <button type="button" data-sub="list" class="active">등록 현황</button>
         <button type="button" data-sub="student">학생 등록</button>
@@ -559,13 +574,18 @@ const DemoAuth = {
   async restore(){ try { const s = JSON.parse(sessionStorage.getItem('hifs_demo_admin')); if (s && s.email) this.use(LocalApi.findAdmin(s.email)); } catch(e){} },
   async login(email, pw){
     const a = LocalApi.findAdmin(email);
-    if (a && pw === CONFIG.DEMO_PASSWORD) {
+    if (a && pw === (a.password || CONFIG.DEMO_PASSWORD)) {
       try { sessionStorage.setItem('hifs_demo_admin', JSON.stringify({ email: a.email })); } catch(e){}
       this.use(a); return { ok: true };
     }
     return { ok: false };
   },
   async refresh(){ const a = adminState && LocalApi.findAdmin(adminState.email); if (a) this.use(a); else await this.logout(); },
+  async changePassword(cur, next){
+    const a = adminState && LocalApi.findAdmin(adminState.email);
+    if (!a || cur !== (a.password || CONFIG.DEMO_PASSWORD)) return { ok: false, message: '현재 비밀번호가 올바르지 않습니다.' };
+    a.password = next; LocalApi.save(); return { ok: true };
+  },
   async logout(){ try { sessionStorage.removeItem('hifs_demo_admin'); } catch(e){} adminState = null; },
 };
 
@@ -596,6 +616,18 @@ const SbAuth = {
     return { ok: true };
   },
   async refresh(){ const r = await this.finish(true); if (!r.ok) adminState = null; },
+  async changePassword(cur, next){
+    const { error: e1 } = await sb.auth.signInWithPassword({ email: adminState.email, password: cur });   // 현재 비밀번호 확인
+    if (e1) return { ok: false, message: '현재 비밀번호가 올바르지 않습니다.' };
+    const { error } = await sb.auth.updateUser({ password: next });
+    if (error) {
+      const m = String(error.message || '');
+      if (/different/i.test(m)) return { ok: false, message: '새 비밀번호가 현재 비밀번호와 같습니다.' };
+      if (/at least|characters|weak/i.test(m)) return { ok: false, message: '새 비밀번호가 너무 짧거나 약합니다. (' + m + ')' };
+      return { ok: false, message: '비밀번호를 바꾸지 못했습니다: ' + m };
+    }
+    return { ok: true };
+  },
   async logout(){ try { await sb.auth.signOut(); } catch(e){} adminState = null; },
 };
 const Auth = USE_SUPABASE ? SbAuth : DemoAuth;
@@ -905,6 +937,7 @@ $('#pwStep').addEventListener('submit', async e => {
   if (showLockMsg()) return;
   const email = $('#loginEmail').value.trim(), pw = $('#loginPw').value;
   if (!email || !pw) { loginFailed('이메일과 비밀번호를 입력해 주세요.'); return; }
+  if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(pw)) { const m = $('#loginMsg'); m.hidden = false; m.textContent = '비밀번호에 한글이 입력됐습니다. 한/영 키를 영문으로 바꾸고 다시 입력해 주세요.'; return; }
   const btn = $('#loginBtn'); btn.disabled = true;
   let res;
   try { res = await Auth.login(email, pw); } catch(err) { res = { ok: false, message: '로그인 중 오류가 발생했습니다.' }; }
@@ -912,7 +945,31 @@ $('#pwStep').addEventListener('submit', async e => {
   if (res.ok) return onLoggedIn();
   loginFailed(res.message);
 });
-$('#logoutBtn').addEventListener('click', async () => { await Auth.logout(); refreshAuthUI(); go('register'); });
+function closePwForm(){ $('#pwChangeForm').reset(); $('#pwErrors').hidden = true; $('#pwChangeForm').hidden = true; }
+$('#pwChangeBtn').addEventListener('click', () => {
+  if ($('#pwChangeForm').hidden) { $('#pwChangeForm').hidden = false; setTimeout(() => $('#pwCur').focus(), 0); }
+  else closePwForm();
+});
+$('#pwCancel').addEventListener('click', closePwForm);
+$('#pwChangeForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const cur = $('#pwCur').value, n1 = $('#pwNew').value, n2 = $('#pwNew2').value, errs = [];
+  if (!cur) errs.push('현재 비밀번호를 입력해 주세요.');
+  if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(cur + n1 + n2)) errs.push('한글이 입력됐습니다. 한/영 키를 영문으로 바꿔 주세요.');
+  if (n1.length < 8) errs.push('새 비밀번호는 8자 이상이어야 합니다.');
+  else if (!/[A-Za-z]/.test(n1) || !/\d/.test(n1)) errs.push('새 비밀번호에 영문과 숫자를 함께 넣어 주세요.');
+  if (n1 !== n2) errs.push('새 비밀번호 확인이 일치하지 않습니다.');
+  if (cur && n1 && cur === n1) errs.push('새 비밀번호가 현재 비밀번호와 같습니다.');
+  if (errs.length) return showErrors($('#pwErrors'), errs);
+  const btn = $('#pwSubmit'); btn.disabled = true;
+  let res;
+  try { res = await Auth.changePassword(cur, n1); } catch(err) { res = { ok: false, message: errMsg(err) }; }
+  btn.disabled = false;
+  if (!res.ok) return showErrors($('#pwErrors'), [res.message]);
+  closePwForm();
+  toast('비밀번호를 바꿨습니다. 다음 로그인부터 새 비밀번호를 사용하세요.');
+});
+$('#logoutBtn').addEventListener('click', async () => { closePwForm(); await Auth.logout(); refreshAuthUI(); go('register'); });
 
 $$('.subtabs button').forEach(b => b.addEventListener('click', () => {
     showSub(b.dataset.sub);
