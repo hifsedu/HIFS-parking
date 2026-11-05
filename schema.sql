@@ -171,7 +171,9 @@ begin
   if jsonb_typeof(p->'students') is distinct from 'array' or jsonb_array_length(p->'students') not between 1 and 6 then
     raise exception '학생 정보를 확인해 주세요.';
   end if;
-  if jsonb_typeof(p->'contacts') is distinct from 'array' or jsonb_array_length(p->'contacts') not between 1 and 10 then
+  -- 학부모 직접 등록은 연락처 1개 이상 필수 / 관리자 등록·CSV는 연락처를 몰라도 등록 가능
+  if jsonb_typeof(coalesce(p->'contacts', '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p->'contacts', '[]'::jsonb)) > 10
+     or (not v_admin and jsonb_array_length(coalesce(p->'contacts', '[]'::jsonb)) < 1) then
     raise exception '연락처를 1개 이상 입력해 주세요.';
   end if;
   if jsonb_typeof(p->'vehicles') is distinct from 'array' or jsonb_array_length(p->'vehicles') not between 1 and 10 then
@@ -198,7 +200,7 @@ begin
   end loop;
 
   i := 0;
-  for r in select value from jsonb_array_elements(p->'contacts') loop
+  for r in select value from jsonb_array_elements(coalesce(p->'contacts', '[]'::jsonb)) loop
     insert into public.guardian_contacts (family_id, relation, phone, sort_order)
     values (v_fid, coalesce(nullif(btrim(r->>'relation'), ''), '기타'), btrim(r->>'phone'), i);
     i := i + 1;

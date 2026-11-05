@@ -144,6 +144,7 @@
   .rc-meta{display:grid;grid-template-columns:52px 1fr;gap:4px 8px;margin:0;font-size:.9rem}
   .rc-meta dt{color:var(--muted)}
   .rc-meta dd{margin:0;min-width:0;overflow-wrap:anywhere}
+  .no-contact{display:inline-block;font-size:.8rem;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--warn);color:var(--warn-fg)}
   .empty-note{text-align:center;padding:24px;color:var(--muted)}
   .rows-table{display:none} .admin-cards{display:grid}   /* 등록 현황은 화면 크기와 상관없이 카드로 */
   .admin-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -202,7 +203,7 @@
       <hr>
 
       <div class="field">
-        <label>학부모 연락처 <em>*</em> <span class="muted">(최소 1개)</span></label>
+        <label>학부모 연락처 <em>*</em> <span class="muted" id="contactNote">(최소 1개)</span></label>
         <div id="contactList"></div>
         <button type="button" class="btn add" id="addContactBtn">+ 연락처 추가 (할아버지, 할머니, 이모, 삼촌 등)</button>
       </div>
@@ -697,6 +698,7 @@ function refreshAuthUI(){
   const admin = isAdmin();
   $('#lookupLock').hidden = admin;
   $('#regMemoWrap').hidden = !admin;
+  $('#contactNote').textContent = admin ? '(관리자는 모르면 비워 두어도 됩니다)' : '(최소 1개)';
   const showEntry = !CONFIG.HIDE_ADMIN_ENTRY || admin || location.hash === '#' + CONFIG.ADMIN_HASH;
   $('#navLookup').hidden = !showEntry; $('#navAdmin').hidden = !showEntry;
   $('nav.tabs').style.gridTemplateColumns = showEntry ? 'repeat(3,1fr)' : '1fr';
@@ -814,7 +816,7 @@ $('#regForm').addEventListener('submit', async e => {
     if (!PHONE_RE.test(ph.value)) { errors.push(`연락처 형식을 확인해 주세요: ${ph.value}`); ph.classList.add('invalid'); return; }
     contacts.push({ relation: rel.value.trim() || '기타', phone: ph.value });
   });
-  if (!contacts.length) { errors.push('학부모 연락처를 1개 이상 입력해 주세요.'); $('#contactList .phone').classList.add('invalid'); }
+  if (!contacts.length && !isAdmin()) { errors.push('학부모 연락처를 1개 이상 입력해 주세요.'); $('#contactList .phone').classList.add('invalid'); }   // 관리자는 연락처를 몰라도 등록 가능
 
   const vehicles = collectVehicles($('#vehicleList'), errors);
   const consent = $('#consent').checked;
@@ -892,7 +894,7 @@ function resultCard(r, q){
     <dt>한글 이름</dt><dd>${esc(s.nameKo)}</dd>
     <dt>영어 이름</dt><dd>${esc(s.nameEn)}</dd>
     <dt>반</dt><dd>${esc(s.className)}</dd>
-    <dt>학부모 연락처</dt><dd>${f.contacts.map(c => `${esc(c.relation)} <a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>`).join('<br>')}</dd>
+    <dt>학부모 연락처</dt><dd>${f.contacts.length ? f.contacts.map(c => `${esc(c.relation)} <a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>`).join('<br>') : '<span class="no-contact">미등록</span>'}</dd>
     <dt>차량 번호</dt><dd>${platesHTML(f.vehicles, q)}</dd>
     ${sibs.length ? `<dt>형제자매</dt><dd>${sibs.map(x => esc(`${x.nameKo}(${x.nameEn}) · ${x.affiliation} ${x.className}`)).join('<br>')}</dd>` : ''}
     ${f.memo ? `<dt>메모</dt><dd>${esc(f.memo)}</dd>` : ''}
@@ -1035,15 +1037,15 @@ function allRows(){
 }
 function renderAdminList(){
   const rows = allRows();
-  const filters = ['전체', ...CONFIG.AFFILIATIONS, '교직원', '외부강사'];
+  const filters = ['전체', ...CONFIG.AFFILIATIONS, '교직원', '외부강사', '연락처 미등록'];
   $('#filterChips').innerHTML = filters.map(f => {
-    const n = f === '전체' ? rows.length : rows.filter(r => r.aff === f).length;
+    const n = f === '전체' ? rows.length : f === '연락처 미등록' ? rows.filter(r => !r.contacts.length).length : rows.filter(r => r.aff === f).length;
     return `<button type="button" data-f="${esc(f)}" class="${f === adminFilter ? 'active' : ''}">${esc(f)} ${n}</button>`;
   }).join('');
   $$('#filterChips button').forEach(b => b.addEventListener('click', () => { adminFilter = b.dataset.f; renderAdminList(); }));
 
   const q = $('#adminSearch').value.trim().toLowerCase(), qn = normPlate(q);
-  const list = rows.filter(r => (adminFilter === '전체' || r.aff === adminFilter) && (!q ||
+  const list = rows.filter(r => (adminFilter === '전체' || r.aff === adminFilter || (adminFilter === '연락처 미등록' && !r.contacts.length)) && (!q ||
     [r.nameKo, r.nameEn, r.cls, r.memo, ...r.contacts].join(' ').toLowerCase().includes(q) ||
     r.vehicles.some(v => normPlate(v.plate).includes(qn))));
 
@@ -1053,7 +1055,7 @@ function renderAdminList(){
     <td>${esc(r.aff)}</td>
     <td><b>${esc(r.nameKo)}</b><br><span class="muted">${esc(r.nameEn)}</span></td>
     <td>${esc(r.cls)}</td>
-    <td class="nowrap">${r.contacts.map(esc).join('<br>')}</td>
+    <td class="nowrap">${r.contacts.length ? r.contacts.map(esc).join('<br>') : '<span class="no-contact">미등록</span>'}</td>
     <td>${r.vehicles.map(v => `<span class="plate">${esc(v.plate)}</span>${v.owner ? ` <small class="muted">(${esc(v.owner)})</small>` : ''}`).join('<br>')}</td>
     <td>${r.sibs.map(esc).join(', ') || '-'}</td>
     <td>${esc(r.memo) || '-'}</td>
@@ -1067,7 +1069,7 @@ function renderAdminList(){
     <div class="rc-name"><b>${esc(r.nameKo)}</b> <span class="muted">${esc(r.nameEn)}</span>${r.cls ? ` · ${esc(r.cls)}` : ''}</div>
     <div class="rc-plates">${r.vehicles.map(v => `<span class="plate-chip">${esc(v.plate)}${v.owner ? `<small>${esc(v.owner)}</small>` : ''}</span>`).join('')}</div>
     <dl class="rc-meta">
-      <dt>연락처</dt><dd>${r.contacts.map(esc).join('<br>')}</dd>
+      <dt>연락처</dt><dd>${r.contacts.length ? r.contacts.map(esc).join('<br>') : '<span class="no-contact">미등록</span>'}</dd>
       ${r.sibs.length ? `<dt>형제</dt><dd>${r.sibs.map(esc).join(', ')}</dd>` : ''}
       ${r.memo ? `<dt>메모</dt><dd>${esc(r.memo)}</dd>` : ''}
     </dl>
@@ -1229,7 +1231,7 @@ const HEADER_ALIASES = {
   '형제그룹': ['형제그룹', '형제', '형제자매', '가족', '가족그룹'],
   '메모':     ['메모', '비고', '특이사항'],
 };
-const CSV_REQUIRED = ['구분', '한글이름', '연락처', '차량번호'];
+const CSV_REQUIRED = ['구분', '한글이름', '차량번호'];
 const normHeader = s => String(s || '').replace(/^﻿/, '').replace(/[\s\/·_\-()\[\]]/g, '').toLowerCase();
 function csvToRecords(rows){
   if (!rows.length) return { families: [], staff: [], errors: ['빈 파일입니다.'] };
@@ -1252,10 +1254,10 @@ function csvToRecords(rows){
     contacts.filter(c => !PHONE_RE.test(c.phone)).forEach(c => errors.push(`${line}행: 연락처 형식 오류 (${c.phone})`));
     if (contacts.bad) errors.push(`${line}행: 연락처로 읽지 못한 부분이 있습니다 (${contacts.bad})`);
     if (!vehicles.length) errors.push(`${line}행: 차량 번호가 없습니다.`);
-    if (!contacts.length) errors.push(`${line}행: 연락처가 없습니다.`);
     if (!g('한글이름')) errors.push(`${line}행: 한글이름이 없습니다.`);
     const type = g('구분').replace(/\s/g, '');
     if (['교직원', '외부강사', '강사', '외부'].includes(type)) {
+      if (!contacts.length) errors.push(`${line}행: 교직원·외부강사는 연락처가 필요합니다.`);
       staff.push({ kind: type === '교직원' ? 'staff' : 'external', nameKo: g('한글이름'), nameEn: g('영어이름'), dept: g('반/부서'), role: g('담당'), phone: contacts[0]?.phone || '', vehicles, memo: g('메모') });
     } else if (type === '학생') {
       const aff = normAff(g('소속'));
