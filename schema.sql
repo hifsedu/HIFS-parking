@@ -69,19 +69,27 @@ create table if not exists public.guardian_contacts (
 create index if not exists contacts_family_idx on public.guardian_contacts(family_id);
 
 -- ---------------------------------------------------------------------
--- 5. 교직원 (관리자만 등록)
+-- 5. 교직원 · 외부강사 (관리자만 등록)
 -- ---------------------------------------------------------------------
 create table if not exists public.staff (
   id          uuid primary key default gen_random_uuid(),
+  kind        text not null default 'staff' check (kind in ('staff','external')),  -- staff: 교직원 / external: 외부강사
   name_ko     text not null check (char_length(name_ko) between 1 and 50),
   name_en     text,
-  department  text not null check (char_length(department) between 1 and 50),  -- 부서
+  department  text check (department is null or char_length(department) <= 50),  -- 부서 (선택)
   role        text,                                                          -- 담당
   phone       text not null check (phone ~ '^0[0-9]{1,2}-[0-9]{3,4}-[0-9]{4}$'),
   memo        text,
   source      text not null default 'admin' check (source in ('admin','csv')),
   created_at  timestamptz not null default now()
 );
+-- 예전에 만든 staff 표 보완: 구분(교직원/외부강사) 칸 추가, 부서는 선택 입력
+alter table public.staff add column if not exists kind text not null default 'staff';
+alter table public.staff drop constraint if exists staff_kind_check;
+alter table public.staff add constraint staff_kind_check check (kind in ('staff','external'));
+alter table public.staff alter column department drop not null;
+alter table public.staff drop constraint if exists staff_department_check;
+alter table public.staff add constraint staff_department_check check (department is null or char_length(department) <= 50);
 
 -- ---------------------------------------------------------------------
 -- 6. 차량 — 가족 또는 교직원 중 정확히 하나에 소속
@@ -206,7 +214,7 @@ begin
   return v_fid;
 end $$;
 
--- 교직원 등록 (관리자 전용)
+-- 교직원 · 외부강사 등록 (관리자 전용)
 create or replace function public.add_staff(p jsonb)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare v_id uuid; r jsonb; i int := 0;
@@ -216,8 +224,8 @@ begin
     raise exception '차량 번호를 1대 이상 입력해 주세요.';
   end if;
 
-  insert into public.staff (name_ko, name_en, department, role, phone, memo, source)
-  values (btrim(p->>'nameKo'), nullif(btrim(p->>'nameEn'), ''), btrim(p->>'dept'), nullif(btrim(p->>'role'), ''),
+  insert into public.staff (kind, name_ko, name_en, department, role, phone, memo, source)
+  values (case when p->>'kind' = 'external' then 'external' else 'staff' end, btrim(p->>'nameKo'), nullif(btrim(p->>'nameEn'), ''), nullif(btrim(p->>'dept'), ''), nullif(btrim(p->>'role'), ''),
           btrim(p->>'phone'), nullif(btrim(p->>'memo'), ''), case when p->>'source' = 'csv' then 'csv' else 'admin' end)
   returning id into v_id;
 

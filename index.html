@@ -47,8 +47,8 @@
   [hidden]{display:none!important}
   body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;font-size:15px}
   header.site{background:var(--header);color:var(--on-header);padding-block:18px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
-  header.site h1{margin:0 auto;max-width:880px;font-size:1.35rem;letter-spacing:-.01em}
-  main{max-width:912px;margin:0 auto;padding-block:16px 60px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+  header.site h1{margin:0 auto;max-width:560px;font-size:1.35rem;letter-spacing:-.01em}
+  main{max-width:592px;margin:0 auto;padding-block:16px 60px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
   a{color:var(--link)}
   code{font-size:.85em;background:var(--accent);color:var(--accent-fg);padding:1px 5px;border-radius:4px}
   .demo-banner{background:var(--warn);color:var(--warn-fg);border-radius:8px;padding:8px 12px;font-size:.85rem;margin-bottom:12px}
@@ -111,9 +111,10 @@
   .admin-only{border:1px dashed var(--navy2);border-radius:10px;padding:12px;background:var(--accent)}
 
   .search-row{display:grid;grid-template-columns:1fr auto;gap:8px}
-  .photo-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-  #ocrBox{margin-top:12px}
-  #ocrPreview{max-width:100%;max-height:220px;border-radius:8px;display:block;margin-bottom:6px}
+  .lookup-hint{display:block;color:var(--muted);font-size:.9rem;margin:-4px 0 10px}
+  .search-row .plate-input{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.6rem;font-weight:700;letter-spacing:.12em;text-align:center;padding:12px 10px;font-variant-numeric:tabular-nums;min-width:0}
+  .search-row .plate-input::placeholder{font-size:1.1rem;font-weight:500;letter-spacing:.02em;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  .lookup-foot{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
   .result{border-left:4px solid var(--navy)}
   .result.staff{border-left-color:var(--ok)}
   .result dl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;margin:0}
@@ -127,8 +128,24 @@
 
   .role-pill{display:inline-block;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--accent);color:var(--accent-fg);margin-left:4px;vertical-align:1px}
   .role-pill.super{background:var(--navy);color:var(--on-navy)}
-  table.admins-table{min-width:520px}
+  table.admins-table{min-width:0}
   .role-select{width:auto;padding:6px 8px;font-size:.9rem}
+  /* 등록 현황: 휴대폰에서는 표 대신 카드 */
+  .admin-cards{display:none;gap:10px}
+  .row-card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--card);display:grid;gap:8px;min-width:0}
+  .rc-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .rc-top .badge{margin:0}
+  .rc-actions{display:flex;gap:2px}
+  .rc-name{font-size:1.05rem;line-height:1.35}
+  .rc-name b{font-size:1.12rem}
+  .rc-plates{display:flex;flex-wrap:wrap;gap:6px}
+  .plate-chip{display:inline-flex;align-items:baseline;gap:5px;border:1.5px solid var(--text);border-radius:6px;padding:3px 9px;background:var(--card);font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:1.05rem;letter-spacing:.02em;white-space:nowrap}
+  .plate-chip small{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;font-weight:500;font-size:.78rem;color:var(--muted);letter-spacing:0}
+  .rc-meta{display:grid;grid-template-columns:52px 1fr;gap:4px 8px;margin:0;font-size:.9rem}
+  .rc-meta dt{color:var(--muted)}
+  .rc-meta dd{margin:0;min-width:0;overflow-wrap:anywhere}
+  .empty-note{text-align:center;padding:24px;color:var(--muted)}
+  .rows-table{display:none} .admin-cards{display:grid}   /* 등록 현황은 화면 크기와 상관없이 카드로 */
   .admin-actions{display:flex;gap:8px;flex-wrap:wrap}
   .admin-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;font-size:.92rem;flex-wrap:wrap}
   .subtabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
@@ -221,17 +238,13 @@
   <section id="sec-lookup" hidden>
     <div class="card">
       <h2>차량 번호 조회</h2>
+      <label class="lookup-hint" for="plateQuery" id="lookupHint"><b>뒷자리 4자리</b>나 <b>전체 번호</b>를 입력하면 바로 조회됩니다.</label>
       <div class="search-row">
-        <input id="plateQuery" type="text" placeholder="차량 번호 또는 뒷자리 4자리 (예: 123가 4567 / 4567)" autocomplete="off">
+        <input id="plateQuery" class="plate-input" type="text" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="4567 / 123가4567">
         <button type="button" class="btn primary" id="searchBtn">조회</button>
       </div>
-      <div class="photo-row">
-        <label class="btn ghost">사진 촬영<input type="file" accept="image/*" capture="environment" id="camInput" hidden></label>
-        <label class="btn ghost">사진 선택<input type="file" accept="image/*" id="fileInput" hidden></label>
-      </div>
-      <div id="ocrBox" hidden>
-        <img id="ocrPreview" alt="업로드한 차량 사진">
-        <p id="ocrStatus" class="muted"></p>
+      <div class="lookup-foot">
+        <button type="button" class="link-btn" id="clearPlateBtn">지우기</button>
       </div>
     </div>
     <div id="results"></div>
@@ -284,7 +297,8 @@
       <div id="sub-list" class="card">
         <div class="chips" id="filterChips"></div>
         <input type="text" id="adminSearch" placeholder="이름, 반, 차량 번호, 연락처 검색" style="margin-bottom:10px">
-        <div class="table-wrap"><table><thead><tr>
+        <div class="admin-cards" id="adminCards"></div>
+        <div class="table-wrap rows-table"><table><thead><tr>
           <th>소속</th><th>이름</th><th>반 / 부서</th><th>연락처</th><th>차량 번호</th><th>형제자매</th><th>메모</th><th>관리</th>
         </tr></thead><tbody id="adminRows"></tbody></table></div>
       </div>
@@ -450,7 +464,23 @@ const LocalApi = {
   db(){
     if (!this._db) {
       try { const d = JSON.parse(localStorage.getItem(DB_KEY)); if (d && Array.isArray(d.families) && Array.isArray(d.staff)) this._db = d; } catch(e){}
-      this._db = this._db || { families: [], staff: [] };
+      if (!this._db) this._db = {   // 미리보기 처음 열 때 보여줄 예시 데이터 (실제 운영과 무관)
+        families: [
+          { id: 'F-ex1', memo: '', source: 'self',
+            students: [ { id: 'S-ex1', affiliation: 'HIFS 유치부', nameKo: '김힙스', nameEn: 'Cathy', className: 'Secret Garden' },
+                        { id: 'S-ex2', affiliation: 'HIFS Global', nameKo: '김하늘', nameEn: 'Sky', className: '1학년 1반' } ],
+            contacts: [ { relation: '부', phone: '010-1234-5678' }, { relation: '모', phone: '010-2345-6789' } ],
+            vehicles: [ { plate: '123가 4567', owner: '아빠 차' }, { plate: '45나 6789', owner: '엄마 차' } ] },
+          { id: 'F-ex2', memo: '할머니가 주로 픽업', source: 'self',
+            students: [ { id: 'S-ex3', affiliation: 'HIFS English', nameKo: '이영어', nameEn: 'Emma', className: '월수금 1부' } ],
+            contacts: [ { relation: '모', phone: '010-5555-6666' }, { relation: '할머니', phone: '010-7777-8888' } ],
+            vehicles: [ { plate: '67다 1234', owner: '할머니 차' } ] },
+        ],
+        staff: [
+          { id: 'T-ex1', kind: 'staff', nameKo: '박선생', nameEn: 'Jane', dept: '교무부', role: '1학년 담임', phone: '010-9876-5432', memo: '', vehicles: [ { plate: '12라 3456', owner: '' } ] },
+          { id: 'T-ex2', kind: 'external', nameKo: '최강사', nameEn: 'Tom', dept: '', role: '방과후 미술', phone: '010-3333-4444', memo: '화목 오후', vehicles: [ { plate: '34마 5678', owner: '' } ] },
+        ],
+      };
       if (!Array.isArray(this._db.admins) || !this._db.admins.length) this._db.admins = [
         { id: 'A1', email: 'admin@hifs.example', name: '최고 관리자(예시)', role: 'super' },
         { id: 'A2', email: 'staff@hifs.example', name: '일반 교직원(예시)', role: 'staff' },
@@ -659,7 +689,7 @@ function go(tab){
   ['register', 'lookup', 'admin'].forEach(t => { $('#sec-' + t).hidden = t !== tab; });
   $$('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   if (tab === 'admin') renderAdmin();
-  if (tab === 'lookup') setTimeout(() => $('#plateQuery').focus(), 50);
+  if (tab === 'lookup') $('#plateQuery').focus();   // 탭을 누른 순간 바로 포커스해야 휴대폰 키패드가 뜸
 }
 $$('nav.tabs button').forEach(b => b.addEventListener('click', () => go(b.dataset.tab)));
 
@@ -869,33 +899,16 @@ function resultCard(r, q){
   </dl></div>`;
 }
 $('#searchBtn').addEventListener('click', doSearch);
-$('#plateQuery').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-
-/* 사진으로 번호판 인식 (브라우저 OCR — 정확도 한계 있음, 인식 결과는 직접 확인) */
-async function runOCR(file){
-  if (!file) return;
-  $('#ocrBox').hidden = false;
-  $('#ocrPreview').src = URL.createObjectURL(file);
-  const status = $('#ocrStatus');
-  status.textContent = '번호판을 인식하는 중입니다... (처음에는 10초 정도 걸릴 수 있어요)';
-  try {
-    if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
-    const { data: { text } } = await Tesseract.recognize(file, 'kor');
-    const cleaned = text.replace(/[^0-9가-힣]/g, '');
-    const m = cleaned.match(/(\d{2,3})([가-힣])(\d{4})/);
-    if (m) {
-      $('#plateQuery').value = `${m[1]}${m[2]} ${m[3]}`;
-      status.textContent = `인식 결과: ${m[1]}${m[2]} ${m[3]} — 다르면 직접 수정 후 조회를 눌러 주세요.`;
-      doSearch();
-    } else {
-      const d = cleaned.match(/\d{4}/g);
-      if (d) { $('#plateQuery').value = d[d.length - 1]; status.textContent = `전체 번호를 인식하지 못해 뒷자리(${d[d.length - 1]})로 검색했습니다. 확인해 주세요.`; doSearch(); }
-      else status.textContent = '번호판을 인식하지 못했습니다. 번호판이 크게 보이도록 다시 찍거나 직접 입력해 주세요.';
-    }
-  } catch (err) { status.textContent = '사진 인식 기능을 불러오지 못했습니다. 차량 번호를 직접 입력해 주세요.'; }
-}
-$('#camInput').addEventListener('change', e => { runOCR(e.target.files[0]); e.target.value = ''; });
-$('#fileInput').addEventListener('change', e => { runOCR(e.target.files[0]); e.target.value = ''; });
+$('#clearPlateBtn').addEventListener('click', () => { $('#plateQuery').value = ''; $('#results').innerHTML = ''; $('#plateQuery').focus(); });
+// 숫자 4자리 또는 전체 번호(123가4567, 서울12가3456)가 완성되면 [조회] 없이 바로 검색
+let lastAutoQuery = '';
+$('#plateQuery').addEventListener('input', e => {
+  const v = e.target.value.trim(), n = normPlate(v);
+  if (!n) { $('#results').innerHTML = ''; lastAutoQuery = ''; return; }
+  if ((/^\d{4}$/.test(n) || isPlate(n)) && n !== lastAutoQuery) { lastAutoQuery = n; doSearch(); e.target.select(); }   // 다음 번호는 그대로 덮어쓰기
+});
+['focus', 'click'].forEach(ev => $('#plateQuery').addEventListener(ev, e => { const t = e.target; setTimeout(() => t.select(), 0); }));   // 다시 누르면 전체 선택 → 바로 다음 번호 입력
+$('#plateQuery').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
 
 /* =========================================================
    3) 관리자
@@ -1034,6 +1047,8 @@ function renderAdminList(){
     [r.nameKo, r.nameEn, r.cls, r.memo, ...r.contacts].join(' ').toLowerCase().includes(q) ||
     r.vehicles.some(v => normPlate(v.plate).includes(qn))));
 
+  const actionBtns = r => `<button type="button" class="link-btn" data-act="memo" data-kind="${r.kind}" data-id="${esc(r.kind === 'staff' ? r.id : r.famId)}">메모</button>`
+    + (isSuper() ? `<button type="button" class="link-btn danger" data-act="del" data-kind="${r.kind}" data-id="${esc(r.id)}" data-fam="${esc(r.famId || '')}">삭제</button>` : '');
   $('#adminRows').innerHTML = list.length ? list.map(r => `<tr>
     <td>${esc(r.aff)}</td>
     <td><b>${esc(r.nameKo)}</b><br><span class="muted">${esc(r.nameEn)}</span></td>
@@ -1042,11 +1057,23 @@ function renderAdminList(){
     <td>${r.vehicles.map(v => `<span class="plate">${esc(v.plate)}</span>${v.owner ? ` <small class="muted">(${esc(v.owner)})</small>` : ''}`).join('<br>')}</td>
     <td>${r.sibs.map(esc).join(', ') || '-'}</td>
     <td>${esc(r.memo) || '-'}</td>
-    <td style="white-space:nowrap"><button class="link-btn" data-act="memo" data-kind="${r.kind}" data-id="${esc(r.kind === 'staff' ? r.id : r.famId)}">메모</button>
-        ${isSuper() ? `<button class="link-btn danger" data-act="del" data-kind="${r.kind}" data-id="${esc(r.id)}" data-fam="${esc(r.famId || '')}">삭제</button>` : ''}</td>
+    <td style="white-space:nowrap">${actionBtns(r)}</td>
   </tr>`).join('') : `<tr><td colspan="8" class="muted" style="text-align:center;padding:24px">등록된 정보가 없습니다.</td></tr>`;
 
-  $$('#adminRows button').forEach(b => b.addEventListener('click', async () => {
+
+  // 휴대폰용 카드 (화면 폭 720px 이하에서 표 대신 보임)
+  $('#adminCards').innerHTML = list.length ? list.map(r => `<article class="row-card">
+    <div class="rc-top"><span class="badge ${r.kind === 'staff' ? 'staff' : ''}">${esc(r.aff)}</span><span class="rc-actions">${actionBtns(r)}</span></div>
+    <div class="rc-name"><b>${esc(r.nameKo)}</b> <span class="muted">${esc(r.nameEn)}</span>${r.cls ? ` · ${esc(r.cls)}` : ''}</div>
+    <div class="rc-plates">${r.vehicles.map(v => `<span class="plate-chip">${esc(v.plate)}${v.owner ? `<small>${esc(v.owner)}</small>` : ''}</span>`).join('')}</div>
+    <dl class="rc-meta">
+      <dt>연락처</dt><dd>${r.contacts.map(esc).join('<br>')}</dd>
+      ${r.sibs.length ? `<dt>형제</dt><dd>${r.sibs.map(esc).join(', ')}</dd>` : ''}
+      ${r.memo ? `<dt>메모</dt><dd>${esc(r.memo)}</dd>` : ''}
+    </dl>
+  </article>`).join('') : '<p class="empty-note">등록된 정보가 없습니다.</p>';
+
+  $$('#adminRows button, #adminCards button').forEach(b => b.addEventListener('click', async () => {
     try {
       if (b.dataset.act === 'memo') {
         const cur = b.dataset.kind === 'staff' ? adminData.staff.find(s => s.id === b.dataset.id)?.memo : adminData.families.find(f => f.id === b.dataset.id)?.memo;
