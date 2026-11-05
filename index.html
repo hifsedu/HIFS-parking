@@ -1161,16 +1161,35 @@ async function readCsvFile(file){
 const normAff = v => CONFIG.AFFILIATIONS.find(a => a === v || a.replace('HIFS ', '') === v.replace('HIFS ', '').trim()) || '';
 function parseContacts(s){ return s.split('|').map(t => t.trim()).filter(Boolean).map(t => { const m = t.match(/^(.+?)\s*:\s*(.+)$/); return { relation: m ? m[1].trim() : '기타', phone: fmtPhone(m ? m[2] : t) }; }); }
 function parseVehicles(s){ return s.split('|').map(t => t.trim()).filter(Boolean).map(t => { const m = t.match(/^(.*?)\s*\((.*)\)\s*$/); return { plate: formatPlate(m ? m[1] : t), owner: m ? m[2].trim() : '' }; }); }
+// 엑셀에서 열 이름을 조금 다르게 써도 알아보도록 (띄어쓰기·괄호·슬래시 무시)
+const HEADER_ALIASES = {
+  '구분':     ['구분', '유형', '분류', '학생교직원'],
+  '소속':     ['소속', '과정', '학부'],
+  '한글이름': ['한글이름', '이름', '성명', '학생이름', '학생한글이름', '국문이름', '한국이름'],
+  '영어이름': ['영어이름', '영문이름', '영문명', '영어명', '학생영어이름', '영문', 'englishname'],
+  '반/부서':  ['반/부서', '반', '부서', '학급', '반또는부서', '반부서'],
+  '담당':     ['담당', '담당업무', '직책'],
+  '연락처':   ['연락처', '학부모연락처', '보호자연락처', '전화번호', '휴대폰', '핸드폰'],
+  '차량번호': ['차량번호', '차량', '차번호'],
+  '형제그룹': ['형제그룹', '형제', '형제자매', '가족', '가족그룹'],
+  '메모':     ['메모', '비고', '특이사항'],
+};
+const CSV_REQUIRED = ['구분', '한글이름', '연락처', '차량번호'];
+const normHeader = s => String(s || '').replace(/^﻿/, '').replace(/[\s\/·_\-()\[\]]/g, '').toLowerCase();
 function csvToRecords(rows){
   if (!rows.length) return { families: [], staff: [], errors: ['빈 파일입니다.'] };
-  const header = rows[0].map(h => h.trim());
-  const missing = CSV_HEADERS.filter(h => !header.includes(h));
-  if (missing.length) return { families: [], staff: [], errors: [`필수 열이 없습니다: ${missing.join(', ')} (양식을 다운로드해 사용해 주세요)`] };
-  const idx = Object.fromEntries(CSV_HEADERS.map(h => [h, header.indexOf(h)]));
+  const header = rows[0].map(normHeader);
+  const idx = {};
+  for (const [key, names] of Object.entries(HEADER_ALIASES)) idx[key] = header.findIndex(hd => names.map(normHeader).includes(hd));
+  const missing = CSV_REQUIRED.filter(k => idx[k] < 0);
+  if (missing.length) return { families: [], staff: [], errors: [
+    `필수 열을 찾지 못했습니다: ${missing.join(', ')}`,
+    `파일의 첫 줄(열 이름): ${rows[0].map(c => String(c).trim()).filter(Boolean).join(', ') || '(비어 있음)'}`,
+    '첫 줄에 열 이름이 있어야 합니다. 양식을 다운로드해 그 첫 줄을 그대로 사용해 주세요.'] };
   const errors = [], staff = [], groups = new Map(), solo = [];
   rows.slice(1).forEach((r, i) => {
     if (r.every(c => !String(c).trim())) return;
-    const line = i + 2, g = k => String(r[idx[k]] ?? '').trim();
+    const line = i + 2, g = k => (idx[k] >= 0 ? String(r[idx[k]] ?? '').trim() : '');
     const vehicles = parseVehicles(g('차량번호'));
     const contacts = parseContacts(g('연락처'));
     vehicles.filter(v => !isPlate(v.plate)).forEach(v => errors.push(`${line}행: 차량 번호 형식 오류 (${v.plate})`));
@@ -1205,7 +1224,7 @@ $('#csvInput').addEventListener('change', async e => {
   const nStu = rec.families.reduce((a, f) => a + f.students.length, 0);
   const box = $('#csvPreview');
   box.innerHTML = `<div class="notice">학생 <b>${nStu}</b>명 (가족 ${rec.families.length}개) · 교직원 <b>${rec.staff.length}</b>명을 읽었습니다.</div>
-    ${rec.errors.length ? `<div class="error-box"><b>확인이 필요한 행 ${rec.errors.length}건</b><br>${rec.errors.slice(0, 30).map(esc).join('<br>')}${rec.errors.length > 30 ? '<br>…' : ''}</div>` : ''}
+    ${rec.errors.length ? `<div class="error-box"><b>확인이 필요한 내용 ${rec.errors.length}건</b><br>${rec.errors.slice(0, 30).map(esc).join('<br>')}${rec.errors.length > 30 ? '<br>…' : ''}</div>` : ''}
     <button type="button" class="btn primary" id="csvApplyBtn" ${rec.errors.length || !(nStu + rec.staff.length) ? 'disabled' : ''}>반영하기</button>
     ${rec.errors.length ? '<p class="muted">오류를 수정한 뒤 다시 업로드해 주세요.</p>' : ''}`;
   const btn = $('#csvApplyBtn');
