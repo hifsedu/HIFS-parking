@@ -576,7 +576,15 @@ const SbAuth = {
   },
   async login(email, pw){
     const { error } = await sb.auth.signInWithPassword({ email, password: pw });
-    if (error) return { ok: false };
+    if (error) {
+      const m = String(error.message || '');
+      if (/not confirmed/i.test(m)) return { ok: false, message: '이메일 인증이 안 된 계정입니다. Supabase에서 계정을 확인(Confirm)해 주세요.' };
+      if (/api key|apikey|jwt/i.test(m)) return { ok: false, message: '서버 연결 키(SUPABASE_ANON_KEY)가 올바르지 않습니다. index.html 설정을 확인해 주세요.' };
+      if (/fetch|network/i.test(m)) return { ok: false, message: '서버에 연결하지 못했습니다. SUPABASE_URL과 인터넷 연결을 확인해 주세요.' };
+      if (/email logins are disabled|provider is disabled/i.test(m)) return { ok: false, message: 'Supabase에서 이메일 로그인이 꺼져 있습니다. Authentication → Sign In / Providers → Email 을 켜 주세요.' };
+      if (/invalid login credentials/i.test(m)) return { ok: false };   // 이메일 또는 비밀번호 오류
+      return { ok: false, message: '로그인하지 못했습니다: ' + m };
+    }
     return this.finish();
   },
   async finish(silent){
