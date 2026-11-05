@@ -77,6 +77,7 @@
 
   .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .seg-opt{display:block;min-width:0}
+  .seg.seg-2{grid-template-columns:repeat(2,1fr)}
   .seg-opt input{position:absolute;opacity:0;pointer-events:none}
   .seg-opt span{display:flex;align-items:center;justify-content:center;min-height:56px;padding:10px 6px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--chip);color:var(--text);font-size:1.02rem;font-weight:700;text-align:center;line-height:1.25;word-break:keep-all}
   .seg-opt span:hover{border-color:var(--navy2)}
@@ -273,7 +274,7 @@
       <div class="subtabs">
         <button type="button" data-sub="list" class="active">등록 현황</button>
         <button type="button" data-sub="student">학생 등록</button>
-        <button type="button" data-sub="staff">교직원 등록</button>
+        <button type="button" data-sub="staff">교직원·강사 등록</button>
         <button type="button" data-sub="csv" class="super-only">CSV 업로드</button>
         <button type="button" data-sub="admins" class="super-only">관리자 관리</button>
       </div>
@@ -289,12 +290,18 @@
       </div>
 
       <form id="staffForm" class="card" hidden novalidate>
-        <h2>교직원 등록</h2>
+        <h2>교직원 · 외부강사 등록</h2>
+        <div class="field"><label>구분 <em>*</em></label>
+          <div class="seg seg-2">
+            <label class="seg-opt"><input type="radio" name="stKind" value="staff" checked><span>교직원</span></label>
+            <label class="seg-opt"><input type="radio" name="stKind" value="external"><span>외부강사</span></label>
+          </div>
+        </div>
         <div class="grid2">
           <div class="field"><label>한글 이름 <em>*</em></label><input id="stNameKo" placeholder="예: 김힙스"></div>
           <div class="field"><label>영어 이름</label><input id="stNameEn" placeholder="예: Cathy"></div>
-          <div class="field"><label>부서 <em>*</em></label><input id="stDept" placeholder="예: 교무부"></div>
-          <div class="field"><label>담당</label><input id="stRole" placeholder="예: 1학년 담임"></div>
+          <div class="field"><label>부서 / 소속</label><input id="stDept" placeholder="예: 교무부 (선택)"></div>
+          <div class="field"><label>담당</label><input id="stRole" placeholder="예: 1학년 담임 (선택)"></div>
         </div>
         <div class="field"><label>연락처 <em>*</em></label><input type="tel" id="stPhone" inputmode="numeric" placeholder="예: 010-1234-5678"></div>
         <div class="field">
@@ -304,7 +311,7 @@
         </div>
         <div class="field"><label>메모 (특이사항)</label><textarea id="stMemo"></textarea></div>
         <div id="staffErrors" class="error-box" hidden></div>
-        <button type="submit" class="btn primary block">교직원 등록</button>
+        <button type="submit" class="btn primary block">등록하기</button>
       </form>
 
       <div id="sub-csv" class="card" hidden>
@@ -416,6 +423,8 @@ function ask({ title, message = '', input = null, okText = '확인', danger = fa
   });
 }
 
+const staffLabel = s => (s && s.kind === 'external') ? '외부강사' : '교직원';
+
 // 차량 번호로 결과 찾기 (두 저장 방식 공용)
 function searchIn(data, q){
   const n = normPlate(q); if (!n) return [];
@@ -428,7 +437,7 @@ function searchIn(data, q){
 function findOwners(data, plate){
   const n = normPlate(plate), names = [];
   data.families.forEach(f => { if (f.vehicles.some(v => normPlate(v.plate) === n)) names.push(f.students.map(s => s.nameKo).join(', ')); });
-  data.staff.forEach(s => { if (s.vehicles.some(v => normPlate(v.plate) === n)) names.push(s.nameKo + '(교직원)'); });
+  data.staff.forEach(s => { if (s.vehicles.some(v => normPlate(v.plate) === n)) names.push(s.nameKo + '(' + staffLabel(s) + ')'); });
   return names;
 }
 
@@ -504,7 +513,7 @@ const LocalApi = {
    데이터 저장소 ② Supabase (실제 운영)
    ========================================================= */
 const FAMILY_COLS = 'id, memo, source, created_at, students(id, affiliation, name_ko, name_en, class_name, created_at), guardian_contacts(relation, phone, sort_order), vehicles(plate_number, owner_label, sort_order)';
-const STAFF_COLS  = 'id, name_ko, name_en, department, role, phone, memo, created_at, vehicles(plate_number, owner_label, sort_order)';
+const STAFF_COLS  = 'id, kind, name_ko, name_en, department, role, phone, memo, created_at, vehicles(plate_number, owner_label, sort_order)';
 const bySort = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
 const mapVehicles = vs => (vs || []).slice().sort(bySort).map(v => ({ plate: v.plate_number, owner: v.owner_label || '' }));
 const mapFamily = f => ({
@@ -514,7 +523,7 @@ const mapFamily = f => ({
   contacts: (f.guardian_contacts || []).slice().sort(bySort).map(c => ({ relation: c.relation, phone: c.phone })),
   vehicles: mapVehicles(f.vehicles),
 });
-const mapStaff = s => ({ id: s.id, nameKo: s.name_ko, nameEn: s.name_en || '', dept: s.department, role: s.role || '', phone: s.phone, memo: s.memo || '', vehicles: mapVehicles(s.vehicles) });
+const mapStaff = s => ({ id: s.id, kind: s.kind || 'staff', nameKo: s.name_ko, nameEn: s.name_en || '', dept: s.department || '', role: s.role || '', phone: s.phone, memo: s.memo || '', vehicles: mapVehicles(s.vehicles) });
 function must(res){ if (res.error) throw res.error; return res.data; }
 
 const SupabaseApi = {
@@ -837,8 +846,8 @@ function platesHTML(vs, q){
 function resultCard(r, q){
   if (r.kind === 'staff') {
     const s = r.staff;
-    return `<div class="card result staff"><span class="badge staff">교직원</span><dl>
-      <dt>소속</dt><dd>교직원 · ${esc(s.dept)}${s.role ? ' / ' + esc(s.role) : ''}</dd>
+    return `<div class="card result staff"><span class="badge staff">${staffLabel(s)}</span><dl>
+      <dt>소속</dt><dd>${staffLabel(s)}${[s.dept, s.role].filter(Boolean).length ? ' · ' + [s.dept, s.role].filter(Boolean).map(esc).join(' / ') : ''}</dd>
       <dt>한글 이름</dt><dd>${esc(s.nameKo)}</dd>
       <dt>영어 이름</dt><dd>${esc(s.nameEn) || '-'}</dd>
       <dt>연락처</dt><dd><a href="tel:${esc(s.phone)}">${esc(s.phone)}</a></dd>
@@ -1006,14 +1015,14 @@ function allRows(){
     sibs: f.students.filter(x => x.id !== s.id).map(x => x.nameKo), memo: f.memo || '',
   })));
   adminData.staff.forEach(s => rows.push({
-    kind: 'staff', id: s.id, aff: '교직원', nameKo: s.nameKo, nameEn: s.nameEn, cls: [s.dept, s.role].filter(Boolean).join(' / '),
+    kind: 'staff', id: s.id, aff: staffLabel(s), nameKo: s.nameKo, nameEn: s.nameEn, cls: [s.dept, s.role].filter(Boolean).join(' / '),
     contacts: [s.phone], vehicles: s.vehicles, sibs: [], memo: s.memo || '',
   }));
   return rows;
 }
 function renderAdminList(){
   const rows = allRows();
-  const filters = ['전체', ...CONFIG.AFFILIATIONS, '교직원'];
+  const filters = ['전체', ...CONFIG.AFFILIATIONS, '교직원', '외부강사'];
   $('#filterChips').innerHTML = filters.map(f => {
     const n = f === '전체' ? rows.length : rows.filter(r => r.aff === f).length;
     return `<button type="button" data-f="${esc(f)}" class="${f === adminFilter ? 'active' : ''}">${esc(f)} ${n}</button>`;
@@ -1112,16 +1121,17 @@ $('#staffForm').addEventListener('submit', async e => {
   $$('#staffForm .invalid').forEach(el => el.classList.remove('invalid'));
   const need = (sel, msg) => { const el = $(sel); if (!el.value.trim()) { errors.push(msg); el.classList.add('invalid'); } return el.value.trim(); };
   const nameKo = need('#stNameKo', '한글 이름을 입력해 주세요.');
-  const dept = need('#stDept', '부서를 입력해 주세요.');
+  const kind = ($('#staffForm input[name=stKind]:checked') || {}).value || 'staff';
+  const dept = $('#stDept').value.trim();
   const phone = need('#stPhone', '연락처를 입력해 주세요.');
   if (phone && !PHONE_RE.test(phone)) { errors.push('연락처 형식을 확인해 주세요.'); $('#stPhone').classList.add('invalid'); }
   const vehicles = collectVehicles($('#stVehicleList'), errors);
   if (errors.length) return showErrors($('#staffErrors'), errors);
   $('#staffErrors').hidden = true;
   try {
-    await Api.addStaff({ nameKo, nameEn: $('#stNameEn').value.trim(), dept, role: $('#stRole').value.trim(), phone, vehicles, memo: $('#stMemo').value.trim(), source: 'admin' });
+    await Api.addStaff({ kind, nameKo, nameEn: $('#stNameEn').value.trim(), dept, role: $('#stRole').value.trim(), phone, vehicles, memo: $('#stMemo').value.trim(), source: 'admin' });
   } catch(err) { return showErrors($('#staffErrors'), ['등록하지 못했습니다: ' + errMsg(err)]); }
-  toast(`${nameKo} 교직원이 등록되었습니다.`);
+  toast(`${nameKo} ${kind === 'external' ? '외부강사' : '교직원'}가 등록되었습니다.`);
   $('#staffForm').reset(); $('#stVehicleList').innerHTML = ''; addVehicleRow($('#stVehicleList'));
 });
 
@@ -1133,6 +1143,7 @@ $('#csvTemplateBtn').addEventListener('click', () => {
     ['학생', 'HIFS Global', '김하늘', 'Sky', '1학년 1반', '', '부:010-1234-5678|모:010-2345-6789', '123가 4567(아빠)|45나 6789(엄마)', 'F001', ''],
     ['학생', 'HIFS English', '이영어', 'Emma', '월수금 1부', '', '모:010-5555-6666|할머니:010-7777-8888', '67다 1234(할머니 차)', '', '할머니 픽업'],
     ['교직원', '', '박선생', 'Jane', '교무부', '1학년 담임', '010-9876-5432', '12라 3456', '', ''],
+    ['외부강사', '', '최강사', 'Tom', '', '방과후 미술', '010-3333-4444', '34마 5678', '', '화목 오후'],
   ];
   const csv = '﻿' + rows.map(r => r.map(c => /[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(',')).join('\r\n');
   const a = document.createElement('a');
@@ -1216,10 +1227,10 @@ function csvToRecords(rows){
     if (!vehicles.length) errors.push(`${line}행: 차량 번호가 없습니다.`);
     if (!contacts.length) errors.push(`${line}행: 연락처가 없습니다.`);
     if (!g('한글이름')) errors.push(`${line}행: 한글이름이 없습니다.`);
-    if (g('구분') === '교직원') {
-      if (!g('반/부서')) errors.push(`${line}행: 교직원의 부서(반/부서 열)가 없습니다.`);
-      staff.push({ nameKo: g('한글이름'), nameEn: g('영어이름'), dept: g('반/부서'), role: g('담당'), phone: contacts[0]?.phone || '', vehicles, memo: g('메모') });
-    } else if (g('구분') === '학생') {
+    const type = g('구분').replace(/\s/g, '');
+    if (['교직원', '외부강사', '강사', '외부'].includes(type)) {
+      staff.push({ kind: type === '교직원' ? 'staff' : 'external', nameKo: g('한글이름'), nameEn: g('영어이름'), dept: g('반/부서'), role: g('담당'), phone: contacts[0]?.phone || '', vehicles, memo: g('메모') });
+    } else if (type === '학생') {
       const aff = normAff(g('소속'));
       if (!aff) errors.push(`${line}행: 소속 오류 (${g('소속')})`);
       if (!g('영어이름')) errors.push(`${line}행: 영어이름이 없습니다.`);
@@ -1232,7 +1243,7 @@ function csvToRecords(rows){
       contacts.forEach(c => { if (!fam.contacts.some(x => x.phone === c.phone)) fam.contacts.push(c); });
       vehicles.forEach(v => { if (!fam.vehicles.some(x => normPlate(x.plate) === normPlate(v.plate))) fam.vehicles.push(v); });
       if (g('메모')) fam.memo = [fam.memo, g('메모')].filter(Boolean).join(' / ');
-    } else errors.push(`${line}행: 구분은 '학생' 또는 '교직원'이어야 합니다.`);
+    } else errors.push(`${line}행: 구분은 '학생', '교직원', '외부강사' 중 하나여야 합니다.`);
   });
   return { families: [...groups.values(), ...solo], staff, errors };
 }
@@ -1242,7 +1253,7 @@ $('#csvInput').addEventListener('change', async e => {
   const rec = csvToRecords(parseCSV(await readCsvFile(file)));
   const nStu = rec.families.reduce((a, f) => a + f.students.length, 0);
   const box = $('#csvPreview');
-  box.innerHTML = `<div class="notice">학생 <b>${nStu}</b>명 (가족 ${rec.families.length}개) · 교직원 <b>${rec.staff.length}</b>명을 읽었습니다.</div>
+  box.innerHTML = `<div class="notice">학생 <b>${nStu}</b>명 (가족 ${rec.families.length}개) · 교직원·외부강사 <b>${rec.staff.length}</b>명을 읽었습니다.</div>
     ${rec.errors.length ? `<div class="error-box"><b>확인이 필요한 내용 ${rec.errors.length}건</b><br>${rec.errors.slice(0, 30).map(esc).join('<br>')}${rec.errors.length > 30 ? '<br>…' : ''}</div>` : ''}
     <button type="button" class="btn primary" id="csvApplyBtn" ${rec.errors.length || !(nStu + rec.staff.length) ? 'disabled' : ''}>반영하기</button>
     ${rec.errors.length ? '<p class="muted">오류를 수정한 뒤 다시 업로드해 주세요.</p>' : ''}`;
