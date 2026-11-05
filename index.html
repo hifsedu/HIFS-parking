@@ -310,7 +310,7 @@
       <div id="sub-csv" class="card" hidden>
         <h2>CSV 일괄 업로드</h2>
         <p class="muted">양식을 내려받아 엑셀에서 작성 후 CSV로 저장해 업로드하세요. 같은 <b>형제그룹</b> 값을 가진 학생은 형제자매로 묶이고 연락처·차량이 공유됩니다.<br>
-        연락처: <code>부:010-1234-5678|모:010-2345-6789</code> · 차량번호: <code>123가 4567(아빠)|45나 6789(엄마)</code></p>
+        연락처: <code>부:010-1234-5678|모:010-2345-6789</code> · 차량번호: <code>123가 4567(아빠)|45나 6789(엄마)</code><br>여러 개는 <code>|</code> <code>/</code> <code>,</code> 중 아무거나로 구분하면 되고, 띄어쓰기·하이픈이 없거나 붙여 써도 알아서 읽습니다.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
           <button type="button" class="btn" id="csvTemplateBtn">양식 다운로드</button>
           <label class="btn primary">CSV 파일 선택<input type="file" accept=".csv,text/csv" id="csvInput" hidden></label>
@@ -1159,8 +1159,25 @@ async function readCsvFile(file){
   return text.replace(/^﻿/, '');
 }
 const normAff = v => CONFIG.AFFILIATIONS.find(a => a === v || a.replace('HIFS ', '') === v.replace('HIFS ', '').trim()) || '';
-function parseContacts(s){ return s.split('|').map(t => t.trim()).filter(Boolean).map(t => { const m = t.match(/^(.+?)\s*:\s*(.+)$/); return { relation: m ? m[1].trim() : '기타', phone: fmtPhone(m ? m[2] : t) }; }); }
-function parseVehicles(s){ return s.split('|').map(t => t.trim()).filter(Boolean).map(t => { const m = t.match(/^(.*?)\s*\((.*)\)\s*$/); return { plate: formatPlate(m ? m[1] : t), owner: m ? m[2].trim() : '' }; }); }
+// CSV 연락처: '부:010-1234-5678|모:01023456789', '부 010-1234-5678 / 모 010-2345-6789', 붙여 쓴 것까지 모두 읽음
+function parseContacts(s){
+  const out = [], re = /([가-힣A-Za-z]*)\s*[:：]?\s*(0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4})/g;
+  let m;
+  while ((m = re.exec(String(s || ''))) !== null) out.push({ relation: m[1] || '기타', phone: fmtPhone(m[2]) });
+  const rest = String(s || '').replace(re, '').replace(/[|/,;·\s]/g, '');
+  if (/\d/.test(rest)) out.bad = rest;          // 전화번호로 읽지 못한 숫자가 남음
+  return out;
+}
+// CSV 차량번호: '123가4567(아빠)|45나 6789(엄마)', '123가4567/45나6789', 공백 없이 붙여 쓴 것까지 모두 읽음
+const PLATE_REGIONS = '서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주';
+function parseVehicles(s){
+  const out = [], re = new RegExp(`((?:(?:${PLATE_REGIONS})\\s*)?\\d{2,3}\\s*[가-힣]\\s*\\d{4})\\s*(?:[(（]([^)）]*)[)）])?`, 'g');
+  let m;
+  while ((m = re.exec(String(s || ''))) !== null) out.push({ plate: formatPlate(m[1]), owner: (m[2] || '').trim() });
+  const rest = String(s || '').replace(re, '').replace(/[|/,;·\s]/g, '');
+  if (/\d/.test(rest)) out.bad = rest;          // 차량 번호로 읽지 못한 숫자가 남음
+  return out;
+}
 // 엑셀에서 열 이름을 조금 다르게 써도 알아보도록 (띄어쓰기·괄호·슬래시 무시)
 const HEADER_ALIASES = {
   '구분':     ['구분', '유형', '분류', '학생교직원'],
@@ -1193,7 +1210,9 @@ function csvToRecords(rows){
     const vehicles = parseVehicles(g('차량번호'));
     const contacts = parseContacts(g('연락처'));
     vehicles.filter(v => !isPlate(v.plate)).forEach(v => errors.push(`${line}행: 차량 번호 형식 오류 (${v.plate})`));
+    if (vehicles.bad) errors.push(`${line}행: 차량 번호로 읽지 못한 부분이 있습니다 (${vehicles.bad})`);
     contacts.filter(c => !PHONE_RE.test(c.phone)).forEach(c => errors.push(`${line}행: 연락처 형식 오류 (${c.phone})`));
+    if (contacts.bad) errors.push(`${line}행: 연락처로 읽지 못한 부분이 있습니다 (${contacts.bad})`);
     if (!vehicles.length) errors.push(`${line}행: 차량 번호가 없습니다.`);
     if (!contacts.length) errors.push(`${line}행: 연락처가 없습니다.`);
     if (!g('한글이름')) errors.push(`${line}행: 한글이름이 없습니다.`);
