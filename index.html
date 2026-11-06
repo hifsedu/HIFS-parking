@@ -649,7 +649,7 @@ const SbAuth = {
   },
   async finish(silent){
     const { data: ok, error } = await sb.rpc('is_admin');
-    if (error || !ok) { await sb.auth.signOut(); return { ok: false, message: silent ? '' : '관리자로 등록되지 않은 계정입니다.' }; }
+    if (error || !ok) { await sb.auth.signOut({ scope: 'local' }); return { ok: false, message: silent ? '' : '관리자로 등록되지 않은 계정입니다.' }; }
     const { data: { user } } = await sb.auth.getUser();
     const { data: me } = await sb.from('admins').select('display_name, role').eq('user_id', user.id).maybeSingle();
     adminState = { email: user.email, name: (me && me.display_name) || '', role: (me && me.role) || 'staff' };
@@ -668,7 +668,7 @@ const SbAuth = {
     }
     return { ok: true };
   },
-  async logout(){ try { await sb.auth.signOut(); } catch(e){} adminState = null; },
+  async logout(){ try { await sb.auth.signOut({ scope: 'local' }); } catch(e){} adminState = null; },
 };
 const Auth = USE_SUPABASE ? SbAuth : DemoAuth;
 
