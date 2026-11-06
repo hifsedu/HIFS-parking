@@ -395,7 +395,8 @@ const CONFIG = {
   HIDE_ADMIN_ENTRY: true,  // true: 외부인에게 '차량 조회/관리자' 버튼 숨김 → 관리자 링크(주소 끝 #admin)로만 접근
   ADMIN_HASH: 'admin',     // 관리자 링크 끝부분. 바꾸면 관리자 링크도 '주소#바꾼값'으로 바뀝니다 (영문·숫자·하이픈만)
   DEMO_PASSWORD: 'hifs1234!', // 미리보기 모드 전용 (미리보기 관리자 계정 공통 비밀번호)
-  MAX_LOGIN_FAIL: 5, LOCK_MINUTES: 10, IDLE_LOGOUT_MINUTES: 120,  // 2시간 동안 사용하지 않으면 자동 로그아웃
+  MAX_LOGIN_FAIL: 5, LOCK_MINUTES: 10, IDLE_LOGOUT_MINUTES: 120,  // 최고 관리자: 2시간 동안 사용하지 않으면 자동 로그아웃
+  STAFF_STAY_SIGNED_IN: true,   // 일반 관리자(공용 계정 등): 직접 로그아웃하기 전까지 로그인 유지 (앱을 닫아도 유지)
 };
 const USE_SUPABASE = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 let sb = null;
@@ -610,14 +611,35 @@ const Lock = {
   set(v){ try { localStorage.setItem('hifs_login_lock', JSON.stringify(v)); } catch(e){} },
 };
 
+// 로그인 정보 저장 위치: 일반 관리자는 기기에 계속 보관(localStorage), 최고 관리자는 브라우저를 닫으면 지워짐(sessionStorage)
+const PERSIST_KEY = 'hifs_persist_login';
+const Persist = {
+  on(){ try { return localStorage.getItem(PERSIST_KEY) === '1'; } catch(e){ return false; } },
+  set(v){
+    try {
+      if (v) localStorage.setItem(PERSIST_KEY, '1'); else localStorage.removeItem(PERSIST_KEY);
+      // 이미 저장된 로그인 정보를 새 위치로 옮김
+      const from = v ? sessionStorage : localStorage, to = v ? localStorage : sessionStorage;
+      for (const k of Object.keys(from)) if (k.startsWith('sb-') || k === 'hifs_demo_admin') { to.setItem(k, from.getItem(k)); from.removeItem(k); }
+    } catch(e){}
+  },
+};
+const sessionStore = {
+  getItem(k){ try { return Persist.on() ? (localStorage.getItem(k) ?? sessionStorage.getItem(k)) : (sessionStorage.getItem(k) ?? localStorage.getItem(k)); } catch(e){ return null; } },
+  setItem(k, v){ try { (Persist.on() ? localStorage : sessionStorage).setItem(k, v); (Persist.on() ? sessionStorage : localStorage).removeItem(k); } catch(e){} },
+  removeItem(k){ try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch(e){} },
+};
+const staysSignedIn = () => !!adminState && adminState.role !== 'super' && CONFIG.STAFF_STAY_SIGNED_IN;
+function applyPersist(){ Persist.set(staysSignedIn()); }
+
 const DemoAuth = {
   use(a){ adminState = a ? { email: a.email, name: a.name, role: a.role } : null; },
-  async restore(){ try { const s = JSON.parse(sessionStorage.getItem('hifs_demo_admin')); if (s && s.email) this.use(LocalApi.findAdmin(s.email)); } catch(e){} },
+  async restore(){ try { const s = JSON.parse(sessionStore.getItem('hifs_demo_admin')); if (s && s.email) { this.use(LocalApi.findAdmin(s.email)); applyPersist(); } } catch(e){} },
   async login(email, pw){
     const a = LocalApi.findAdmin(email);
     if (a && pw === (a.password || CONFIG.DEMO_PASSWORD)) {
-      try { sessionStorage.setItem('hifs_demo_admin', JSON.stringify({ email: a.email })); } catch(e){}
-      this.use(a); return { ok: true };
+      sessionStore.setItem('hifs_demo_admin', JSON.stringify({ email: a.email }));
+      this.use(a); applyPersist(); return { ok: true };
     }
     return { ok: false };
   },
@@ -627,13 +649,18 @@ const DemoAuth = {
     if (!a || cur !== (a.password || CONFIG.DEMO_PASSWORD)) return { ok: false, message: '현재 비밀번호가 올바르지 않습니다.' };
     a.password = next; LocalApi.save(); return { ok: true };
   },
-  async logout(){ try { sessionStorage.removeItem('hifs_demo_admin'); } catch(e){} adminState = null; },
+  async logout(){ sessionStore.removeItem('hifs_demo_admin'); Persist.set(false); adminState = null; },
 };
 
 const SbAuth = {
   async restore(){
     const { data: { session } } = await sb.auth.getSession();
-    if (session) await this.finish(true);
+    if (!session) return;
+    for (let i = 0; i < 4; i++) {                       // 와이파이가 잠깐 끊겨도 로그아웃되지 않도록 몇 번 다시 시도
+      const r = await this.finish(true);
+      if (r.ok || !r.retry) return;
+      await new Promise(res => setTimeout(res, 3000));
+    }
   },
   async login(email, pw){
     const { error } = await sb.auth.signInWithPassword({ email, password: pw });
@@ -650,13 +677,15 @@ const SbAuth = {
   },
   async finish(silent){
     const { data: ok, error } = await sb.rpc('is_admin');
-    if (error || !ok) { await sb.auth.signOut({ scope: 'local' }); return { ok: false, message: silent ? '' : '관리자로 등록되지 않은 계정입니다.' }; }
+    if (error) return { ok: false, retry: true, message: silent ? '' : '서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.' };   // 연결 오류: 로그인은 유지
+    if (!ok) { await sb.auth.signOut({ scope: 'local' }); Persist.set(false); return { ok: false, message: silent ? '' : '관리자로 등록되지 않은 계정입니다.' }; }
     const { data: { user } } = await sb.auth.getUser();
     const { data: me } = await sb.from('admins').select('display_name, role').eq('user_id', user.id).maybeSingle();
     adminState = { email: user.email, name: (me && me.display_name) || '', role: (me && me.role) || 'staff' };
+    applyPersist();
     return { ok: true };
   },
-  async refresh(){ const r = await this.finish(true); if (!r.ok) adminState = null; },
+  async refresh(){ const r = await this.finish(true); if (!r.ok && !r.retry) adminState = null; },
   async changePassword(cur, next){
     const { error: e1 } = await sb.auth.signInWithPassword({ email: adminState.email, password: cur });   // 현재 비밀번호 확인
     if (e1) return { ok: false, message: '현재 비밀번호가 올바르지 않습니다.' };
@@ -669,13 +698,13 @@ const SbAuth = {
     }
     return { ok: true };
   },
-  async logout(){ try { await sb.auth.signOut({ scope: 'local' }); } catch(e){} adminState = null; },
+  async logout(){ try { await sb.auth.signOut({ scope: 'local' }); } catch(e){} sessionStore.removeItem('hifs_demo_admin'); Persist.set(false); adminState = null; },
 };
 const Auth = USE_SUPABASE ? SbAuth : DemoAuth;
 
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true }));
 setInterval(async () => {
-  if (isAdmin() && Date.now() - lastActive > CONFIG.IDLE_LOGOUT_MINUTES * 60000) {
+  if (isAdmin() && !staysSignedIn() && Date.now() - lastActive > CONFIG.IDLE_LOGOUT_MINUTES * 60000) {
     await Auth.logout(); refreshAuthUI(); go('register');
     toast('장시간 사용하지 않아 로그아웃되었습니다.');
   }
@@ -924,7 +953,7 @@ function renderAdmin(){
   $('#loginBox').hidden = admin; $('#adminPanel').hidden = !admin;
   if (admin) {
     $('#adminWho').textContent = (adminState.name ? adminState.name + ' · ' : '') + adminState.email;
-    $('#adminRole').textContent = isSuper() ? '최고 관리자' : '일반 관리자';
+    $('#adminRole').textContent = isSuper() ? '최고 관리자' : (staysSignedIn() ? '일반 관리자 · 로그인 유지' : '일반 관리자');
     $('#adminRole').classList.toggle('super', isSuper());
     $$('.super-only').forEach(el => { el.hidden = !isSuper(); });
     showSub(currentSub);
@@ -1329,7 +1358,7 @@ go(location.hash === '#' + CONFIG.ADMIN_HASH ? 'admin' : 'register');
       // 주소 끝에 /rest/v1/ 등이 붙어 있어도 프로젝트 주소만 쓰도록 정리
       const baseUrl = CONFIG.SUPABASE_URL.trim().replace(/\/(rest|auth)\/v1\/?$/, '').replace(/\/+$/, '');
       sb = window.supabase.createClient(baseUrl, CONFIG.SUPABASE_ANON_KEY.trim(), {
-        auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true }, // 브라우저를 닫으면 로그아웃
+        auth: { storage: sessionStore, persistSession: true, autoRefreshToken: true }, // 일반 관리자는 계속 유지, 최고 관리자는 브라우저를 닫으면 로그아웃
       });
       await Api.loadClassOptions();
       await Auth.restore();
