@@ -258,6 +258,7 @@
       <form id="pwStep" novalidate>
         <div class="field"><label>이메일</label><input type="email" id="loginEmail" autocomplete="username"></div>
         <div class="field"><label>비밀번호</label><input type="password" id="loginPw" autocomplete="current-password"></div>
+        <div class="field"><label class="consent" for="saveEmail"><input type="checkbox" id="saveEmail" checked> <span>이메일 저장</span></label></div>
         <button type="submit" class="btn primary block" id="loginBtn">로그인</button>
       </form>
 
@@ -928,7 +929,10 @@ function renderAdmin(){
     $$('.super-only').forEach(el => { el.hidden = !isSuper(); });
     showSub(currentSub);
   }
-  else showLockMsg();
+  else {
+    showLockMsg(); fillSavedEmail();
+    if ($('#loginEmail').value) setTimeout(() => $('#loginPw').focus(), 0);
+  }
 }
 async function reloadAdmin(){
   try { adminData = await Api.listAll(); } catch(err) { toast('목록을 불러오지 못했습니다: ' + errMsg(err)); }
@@ -950,7 +954,22 @@ function loginFailed(message){
 function resetLoginSteps(){
   $('#loginPw').value = '';
 }
+// 이메일 저장: 로그인에 성공한 이메일을 이 기기에 기억해 두고 다음에 자동으로 채움 (비밀번호는 저장하지 않음)
+const SAVED_EMAIL_KEY = 'hifs_saved_email';
+function rememberEmail(){
+  try {
+    if ($('#saveEmail').checked) localStorage.setItem(SAVED_EMAIL_KEY, $('#loginEmail').value.trim());
+    else localStorage.removeItem(SAVED_EMAIL_KEY);
+  } catch(e){}
+}
+function fillSavedEmail(){
+  let saved = '';
+  try { saved = localStorage.getItem(SAVED_EMAIL_KEY) || ''; } catch(e){}
+  if (saved && !$('#loginEmail').value) $('#loginEmail').value = saved;
+  $('#saveEmail').checked = !!saved || $('#saveEmail').checked;
+}
 function onLoggedIn(){
+  rememberEmail();
   Lock.set({ fails: 0, until: 0 });
   resetLoginSteps(); refreshAuthUI();
   const t = pendingTab || 'admin'; pendingTab = null; go(t);
