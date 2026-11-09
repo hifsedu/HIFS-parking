@@ -240,6 +240,86 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- 9-1. 수정 함수 (최고·일반 관리자 모두)
+--      이름·반·연락처·차량·메모를 한 번에 저장 (연락처·차량은 받은 목록으로 통째로 교체)
+-- ---------------------------------------------------------------------
+create or replace function public.update_family(p jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_fid uuid := (p->>'id')::uuid; r jsonb; i int;
+begin
+  if not public.is_admin() then raise exception '권한이 없습니다.'; end if;
+  if not exists (select 1 from public.families where id = v_fid) then raise exception '수정할 정보를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.'; end if;
+  if jsonb_typeof(p->'students') is distinct from 'array' or jsonb_array_length(p->'students') not between 1 and 6 then
+    raise exception '학생 정보를 확인해 주세요.';
+  end if;
+  if jsonb_typeof(p->'vehicles') is distinct from 'array' or jsonb_array_length(p->'vehicles') not between 1 and 10 then
+    raise exception '차량 번호를 1대 이상 입력해 주세요.';
+  end if;
+  if jsonb_array_length(coalesce(p->'contacts', '[]'::jsonb)) > 10 then raise exception '연락처는 10개까지 입력할 수 있습니다.'; end if;
+
+  -- 학생: id 가 있으면 수정, 없으면 형제자매로 추가 (학생 삭제는 최고 관리자가 목록에서)
+  for r in select value from jsonb_array_elements(p->'students') loop
+    if nullif(r->>'id', '') is not null then
+      update public.students
+         set affiliation = r->>'affiliation', name_ko = btrim(r->>'nameKo'), name_en = btrim(r->>'nameEn'), class_name = btrim(r->>'className')
+       where id = (r->>'id')::uuid and family_id = v_fid;
+    else
+      insert into public.students (family_id, affiliation, name_ko, name_en, class_name)
+      values (v_fid, r->>'affiliation', btrim(r->>'nameKo'), btrim(r->>'nameEn'), btrim(r->>'className'));
+    end if;
+  end loop;
+
+  delete from public.guardian_contacts where family_id = v_fid;
+  i := 0;
+  for r in select value from jsonb_array_elements(coalesce(p->'contacts', '[]'::jsonb)) loop
+    insert into public.guardian_contacts (family_id, relation, phone, sort_order)
+    values (v_fid, coalesce(nullif(btrim(r->>'relation'), ''), '기타'), btrim(r->>'phone'), i);
+    i := i + 1;
+  end loop;
+
+  delete from public.vehicles where family_id = v_fid;
+  i := 0;
+  for r in select value from jsonb_array_elements(p->'vehicles') loop
+    insert into public.vehicles (family_id, plate_number, owner_label, sort_order)
+    values (v_fid, btrim(r->>'plate'), nullif(btrim(r->>'owner'), ''), i);
+    i := i + 1;
+  end loop;
+
+  update public.families set memo = nullif(btrim(p->>'memo'), '') where id = v_fid;
+  insert into public.audit_logs (user_id, action, detail) values (auth.uid(), 'update_family', v_fid::text);
+end $$;
+
+create or replace function public.update_staff(p jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_id uuid := (p->>'id')::uuid; r jsonb; i int := 0;
+begin
+  if not public.is_admin() then raise exception '권한이 없습니다.'; end if;
+  if not exists (select 1 from public.staff where id = v_id) then raise exception '수정할 정보를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.'; end if;
+  if jsonb_typeof(p->'vehicles') is distinct from 'array' or jsonb_array_length(p->'vehicles') not between 1 and 10 then
+    raise exception '차량 번호를 1대 이상 입력해 주세요.';
+  end if;
+
+  update public.staff
+     set kind = case when p->>'kind' = 'external' then 'external' else 'staff' end,
+         name_ko = btrim(p->>'nameKo'), name_en = nullif(btrim(p->>'nameEn'), ''),
+         department = nullif(btrim(p->>'dept'), ''), role = nullif(btrim(p->>'role'), ''),
+         phone = btrim(p->>'phone'), memo = nullif(btrim(p->>'memo'), '')
+   where id = v_id;
+
+  delete from public.vehicles where staff_id = v_id;
+  for r in select value from jsonb_array_elements(p->'vehicles') loop
+    insert into public.vehicles (staff_id, plate_number, owner_label, sort_order)
+    values (v_id, btrim(r->>'plate'), nullif(btrim(r->>'owner'), ''), i);
+    i := i + 1;
+  end loop;
+  insert into public.audit_logs (user_id, action, detail) values (auth.uid(), 'update_staff', v_id::text);
+end $$;
+
+revoke execute on function public.update_family(jsonb), public.update_staff(jsonb) from public, anon;
+grant execute on function public.update_family(jsonb) to authenticated;
+grant execute on function public.update_staff(jsonb)  to authenticated;
+
+-- ---------------------------------------------------------------------
 -- 10. 행 수준 보안(RLS) — 관리자만 읽기/수정
 -- ---------------------------------------------------------------------
 alter table public.class_options     enable row level security;

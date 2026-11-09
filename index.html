@@ -121,6 +121,8 @@
   .result dt{color:var(--muted);font-size:.9rem}
   .result dd{margin:0;font-weight:500;min-width:0}
   .badge{display:inline-block;font-size:.78rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--accent);color:var(--accent-fg);margin-bottom:8px}
+  .result-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+  .result-top .badge{margin:0}
   .badge.staff{background:var(--ok-bg);color:var(--ok)}
   .plate{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;white-space:nowrap}
   .plate.hit{background:var(--hit);color:var(--hit-fg);padding:0 4px;border-radius:4px}
@@ -162,6 +164,16 @@
   .lock-msg{color:var(--danger);font-size:.9rem;margin-top:8px}
   .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);padding:10px 16px;border-radius:8px;font-size:.92rem;z-index:99;max-width:90vw}
 
+  /* 수정 화면 (아래에서 올라오는 시트) */
+  .sheet-back{position:fixed;inset:0;background:var(--scrim);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+  .sheet{background:var(--bg);width:100%;max-width:560px;max-height:calc(100% - 24px - env(safe-area-inset-top, 0px));display:flex;flex-direction:column;border-radius:16px 16px 0 0;border:1px solid var(--line);border-bottom:0;overflow:hidden}
+  .sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+  .sheet-head h2{margin:0;font-size:1.1rem}
+  .sheet-body{overflow-y:auto;padding:16px;display:grid;gap:4px;-webkit-overflow-scrolling:touch}
+  .sheet-foot{display:grid;grid-template-columns:1fr 2fr;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));border-top:1px solid var(--line);background:var(--card)}
+  .sheet-foot .btn{padding:13px}
+  .edit-section{font-weight:700;font-size:.95rem;margin:10px 0 6px}
+  .edit-section:first-child{margin-top:0}
   .modal-back{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
   .modal{background:var(--card);color:var(--text);border-radius:var(--radius);padding:18px;width:100%;max-width:420px;display:grid;gap:10px;border:1px solid var(--line)}
   .modal p{margin:0}
@@ -362,6 +374,14 @@
   </section>
 </main>
 
+<div class="sheet-back" id="editSheet" hidden role="dialog" aria-modal="true" aria-labelledby="editTitle">
+  <form class="sheet" id="editForm" novalidate>
+    <div class="sheet-head"><h2 id="editTitle">정보 수정</h2><button type="button" class="link-btn" id="editClose">닫기</button></div>
+    <div class="sheet-body" id="editBody"></div>
+    <div class="sheet-foot"><button type="button" class="btn" id="editCancel">취소</button><button type="submit" class="btn primary" id="editSave">저장</button></div>
+  </form>
+</div>
+
 <div class="modal-back" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
   <div class="modal">
     <h3 id="modalTitle"></h3>
@@ -499,6 +519,21 @@ const LocalApi = {
     this.save();
   },
   async addStaff(s){ this.db().staff.push({ ...s, id: uid('T') }); this.save(); },
+  async getFamily(id){ const f = this.db().families.find(x => x.id === id); if (!f) throw new Error('수정할 정보를 찾지 못했습니다.'); return JSON.parse(JSON.stringify(f)); },
+  async getStaff(id){ const s = this.db().staff.find(x => x.id === id); if (!s) throw new Error('수정할 정보를 찾지 못했습니다.'); return JSON.parse(JSON.stringify(s)); },
+  async updateFamily(p){
+    const f = this.db().families.find(x => x.id === p.id); if (!f) throw new Error('수정할 정보를 찾지 못했습니다.');
+    p.students.forEach(s => {
+      const cur = s.id && f.students.find(x => x.id === s.id);
+      if (cur) Object.assign(cur, { affiliation: s.affiliation, nameKo: s.nameKo, nameEn: s.nameEn, className: s.className });
+      else f.students.push({ affiliation: s.affiliation, nameKo: s.nameKo, nameEn: s.nameEn, className: s.className, id: uid('S') });
+    });
+    f.contacts = p.contacts; f.vehicles = p.vehicles; f.memo = p.memo; this.save();
+  },
+  async updateStaff(p){
+    const s = this.db().staff.find(x => x.id === p.id); if (!s) throw new Error('수정할 정보를 찾지 못했습니다.');
+    Object.assign(s, { kind: p.kind, nameKo: p.nameKo, nameEn: p.nameEn, dept: p.dept, role: p.role, phone: p.phone, vehicles: p.vehicles, memo: p.memo }); this.save();
+  },
   async listAll(){ return this.db(); },
   async searchPlate(q){ return searchIn(this.db(), q); },
   async updateMemo(kind, id, memo){
@@ -588,6 +623,10 @@ const SupabaseApi = {
     return searchIn({ families: must(f).map(mapFamily), staff: must(s).map(mapStaff) }, q);
   },
   async updateMemo(kind, id, memo){ must(await sb.from(kind === 'staff' ? 'staff' : 'families').update({ memo: memo || null }).eq('id', id)); },
+  async getFamily(id){ return mapFamily(must(await sb.from('families').select(FAMILY_COLS).eq('id', id).single())); },
+  async getStaff(id){ return mapStaff(must(await sb.from('staff').select(STAFF_COLS).eq('id', id).single())); },
+  async updateFamily(p){ must(await sb.rpc('update_family', { p })); },
+  async updateStaff(p){ must(await sb.rpc('update_staff', { p })); },
   async removeStudent(famId, stuId){ must(await sb.from('students').delete().eq('id', stuId)); },  // 마지막 학생이면 가족도 DB에서 자동 삭제
   async removeStaff(id){ must(await sb.from('staff').delete().eq('id', id)); },
   async importData(rec){ return must(await sb.rpc('admin_import', { p: { families: rec.families, staff: rec.staff } })); },
@@ -738,7 +777,7 @@ window.addEventListener('hashchange', () => { refreshAuthUI(); if (location.hash
 /* =========================================================
    1) 차량 등록 폼
    ========================================================= */
-function addStudentCard(){
+function addStudentCard(container = $('#studentList'), data = null){
   const id = uid('c');
   const card = document.createElement('div');
   card.className = 'student-card';
@@ -753,9 +792,19 @@ function addStudentCard(){
     </div>
     <div class="field"><label>반 <em>*</em></label><div class="class-slot"><input class="className" placeholder="소속을 먼저 선택해 주세요" disabled></div></div>`;
   $$('input[type=radio]', card).forEach(r => r.addEventListener('change', () => renderClassSlot(card, r.value)));
-  card.querySelector('.remove-stu').addEventListener('click', () => { card.remove(); renumberStudents(); });
-  $('#studentList').appendChild(card);
-  renumberStudents();
+  card.querySelector('.remove-stu').addEventListener('click', () => { card.remove(); renumberStudents(container); });
+  if (data) {                                  // 수정 화면: 기존 값 채우기
+    if (data.id) card.dataset.sid = data.id;
+    const radio = $$('input[type=radio]', card).find(r => r.value === data.affiliation);
+    if (radio) { radio.checked = true; renderClassSlot(card, data.affiliation); }
+    card.querySelector('.nameKo').value = data.nameKo || '';
+    card.querySelector('.nameEn').value = data.nameEn || '';
+    const cls = card.querySelector('.className');
+    if (cls.tagName === 'SELECT' && data.className && ![...cls.options].some(o => o.value === data.className)) cls.add(new Option(data.className, data.className));
+    cls.value = data.className || '';
+  }
+  container.appendChild(card);
+  renumberStudents(container);
 }
 function renderClassSlot(card, aff){
   const slot = card.querySelector('.class-slot');
@@ -764,27 +813,27 @@ function renderClassSlot(card, aff){
     ? `<select class="className"><option value="">반을 선택해 주세요</option>${opts.map(c => `<option>${esc(c)}</option>`).join('')}</select>`
     : `<input class="className" placeholder="${esc(CONFIG.CLASS_PLACEHOLDER[aff] || '')}" autocomplete="off">`;
 }
-function renumberStudents(){
-  $$('#studentList .student-card').forEach((c, i) => {
+function renumberStudents(container = $('#studentList')){
+  $$('.student-card', container).forEach((c, i) => {
     c.querySelector('.stu-title').textContent = i === 0 ? '학생 정보' : `형제자매 ${i}`;
-    c.querySelector('.remove-stu').hidden = i === 0;
+    c.querySelector('.remove-stu').hidden = i === 0 || !!c.dataset.sid;   // 이미 등록된 학생은 수정 화면에서 지우지 않음
   });
 }
-function addContactRow(container, relation = '', fixed = false){
+function addContactRow(container, relation = '', fixed = false, phone = ''){
   const row = document.createElement('div');
   row.className = 'row contact-row';
   row.innerHTML = `<input class="rel" list="relList" placeholder="관계" value="${esc(relation)}" ${fixed ? 'readonly' : ''}>
-    <input class="phone" type="tel" inputmode="numeric" placeholder="예: 010-1234-5678">
+    <input class="phone" type="tel" inputmode="numeric" placeholder="예: 010-1234-5678" value="${esc(phone)}">
     <button type="button" class="icon-btn" title="삭제" ${fixed ? 'style="visibility:hidden"' : ''}>✕</button>`;
   row.querySelector('.phone').addEventListener('input', e => e.target.value = fmtPhone(e.target.value));
   row.querySelector('.icon-btn').addEventListener('click', () => row.remove());
   container.appendChild(row);
 }
-function addVehicleRow(container){
+function addVehicleRow(container, v = null){
   const row = document.createElement('div');
   row.className = 'row vehicle-row';
-  row.innerHTML = `<input class="plate" placeholder="예: 123가 4567" autocomplete="off">
-    <input class="owner" placeholder="예: 아빠 차">
+  row.innerHTML = `<input class="plate" placeholder="예: 123가 4567" autocomplete="off" value="${esc(v ? v.plate : '')}">
+    <input class="owner" placeholder="예: 아빠 차" value="${esc(v ? v.owner : '')}">
     <button type="button" class="icon-btn" title="삭제">✕</button>`;
   row.querySelector('.plate').addEventListener('blur', e => { if (isPlate(e.target.value)) e.target.value = formatPlate(e.target.value); });
   row.querySelector('.icon-btn').addEventListener('click', () => {
@@ -908,7 +957,7 @@ function platesHTML(vs, q){
 function resultCard(r, q){
   if (r.kind === 'staff') {
     const s = r.staff;
-    return `<div class="card result staff"><span class="badge staff">${staffLabel(s)}</span><dl>
+    return `<div class="card result staff"><div class="result-top"><span class="badge staff">${staffLabel(s)}</span><button type="button" class="link-btn" data-edit-kind="staff" data-edit-id="${esc(s.id)}">수정</button></div><dl>
       <dt>소속</dt><dd>${staffLabel(s)}${[s.dept, s.role].filter(Boolean).length ? ' · ' + [s.dept, s.role].filter(Boolean).map(esc).join(' / ') : ''}</dd>
       <dt>한글 이름</dt><dd>${esc(s.nameKo)}</dd>
       <dt>영어 이름</dt><dd>${esc(s.nameEn) || '-'}</dd>
@@ -919,7 +968,7 @@ function resultCard(r, q){
   }
   const f = r.family, s = r.student;
   const sibs = f.students.filter(x => x.id !== s.id);
-  return `<div class="card result"><span class="badge">${esc(s.affiliation)}</span><dl>
+  return `<div class="card result"><div class="result-top"><span class="badge">${esc(s.affiliation)}</span><button type="button" class="link-btn" data-edit-kind="student" data-edit-id="${esc(f.id)}">수정</button></div><dl>
     <dt>소속</dt><dd>${esc(s.affiliation)}</dd>
     <dt>한글 이름</dt><dd>${esc(s.nameKo)}</dd>
     <dt>영어 이름</dt><dd>${esc(s.nameEn)}</dd>
@@ -931,6 +980,7 @@ function resultCard(r, q){
   </dl></div>`;
 }
 $('#searchBtn').addEventListener('click', doSearch);
+$('#results').addEventListener('click', e => { const b = e.target.closest('[data-edit-kind]'); if (b) openEdit(b.dataset.editKind, b.dataset.editId); });
 $('#clearPlateBtn').addEventListener('click', () => { $('#plateQuery').value = ''; $('#results').innerHTML = ''; $('#plateQuery').focus(); });
 // 숫자 4자리 또는 전체 번호(123가4567, 서울12가3456)가 완성되면 [조회] 없이 바로 검색
 let lastAutoQuery = '';
@@ -1097,7 +1147,8 @@ function renderAdminList(){
     [r.nameKo, r.nameEn, r.cls, r.memo, ...r.contacts].join(' ').toLowerCase().includes(q) ||
     r.vehicles.some(v => normPlate(v.plate).includes(qn))));
 
-  const actionBtns = r => `<button type="button" class="link-btn" data-act="memo" data-kind="${r.kind}" data-id="${esc(r.kind === 'staff' ? r.id : r.famId)}">메모</button>`
+  const actionBtns = r => `<button type="button" class="link-btn" data-act="edit" data-kind="${r.kind}" data-id="${esc(r.kind === 'staff' ? r.id : r.famId)}">수정</button>`
+    + `<button type="button" class="link-btn" data-act="memo" data-kind="${r.kind}" data-id="${esc(r.kind === 'staff' ? r.id : r.famId)}">메모</button>`
     + (isSuper() ? `<button type="button" class="link-btn danger" data-act="del" data-kind="${r.kind}" data-id="${esc(r.id)}" data-fam="${esc(r.famId || '')}">삭제</button>` : '');
   $('#adminRows').innerHTML = list.length ? list.map(r => `<tr>
     <td>${esc(r.aff)}</td>
@@ -1124,6 +1175,7 @@ function renderAdminList(){
   </article>`).join('') : '<p class="empty-note">등록된 정보가 없습니다.</p>';
 
   $$('#adminRows button, #adminCards button').forEach(b => b.addEventListener('click', async () => {
+    if (b.dataset.act === 'edit') return openEdit(b.dataset.kind, b.dataset.id);
     try {
       if (b.dataset.act === 'memo') {
         const cur = b.dataset.kind === 'staff' ? adminData.staff.find(s => s.id === b.dataset.id)?.memo : adminData.families.find(f => f.id === b.dataset.id)?.memo;
@@ -1139,6 +1191,104 @@ function renderAdminList(){
   }));
 }
 $('#adminSearch').addEventListener('input', renderAdminList);
+
+/* 정보 수정 (최고·일반 관리자 모두) */
+let editing = null;   // { kind: 'student' | 'staff', id }
+function closeEdit(){ $('#editSheet').hidden = true; $('#editBody').innerHTML = ''; editing = null; document.body.style.overflow = ''; }
+async function openEdit(kind, id){
+  if (!isAdmin()) return go('admin');
+  let data;
+  try { data = kind === 'staff' ? await Api.getStaff(id) : await Api.getFamily(id); }
+  catch(err) { toast('불러오지 못했습니다: ' + errMsg(err)); return; }
+  editing = { kind: kind === 'staff' ? 'staff' : 'student', id };
+  const body = $('#editBody');
+  if (editing.kind === 'staff') {
+    $('#editTitle').textContent = `${staffLabel(data)} 정보 수정`;
+    body.innerHTML = `
+      <div class="field"><label>구분</label><div class="seg seg-2">
+        <label class="seg-opt"><input type="radio" name="edKind" value="staff" ${data.kind !== 'external' ? 'checked' : ''}><span>교직원</span></label>
+        <label class="seg-opt"><input type="radio" name="edKind" value="external" ${data.kind === 'external' ? 'checked' : ''}><span>외부강사</span></label></div></div>
+      <div class="grid2">
+        <div class="field"><label for="edNameKo">한글 이름 <em>*</em></label><input id="edNameKo" value="${esc(data.nameKo)}"></div>
+        <div class="field"><label for="edNameEn">영어 이름</label><input id="edNameEn" value="${esc(data.nameEn)}"></div>
+        <div class="field"><label for="edDept">부서 / 소속</label><input id="edDept" value="${esc(data.dept)}"></div>
+        <div class="field"><label for="edRole">담당</label><input id="edRole" value="${esc(data.role)}"></div>
+      </div>
+      <div class="field"><label for="edPhone">연락처 <em>*</em></label><input type="tel" id="edPhone" inputmode="numeric" value="${esc(data.phone)}"></div>
+      <div class="field"><label>차량 번호 <em>*</em></label><div id="edVehicles"></div><button type="button" class="btn add" id="edAddVehicle">+ 차량 추가</button></div>
+      <div class="field"><label for="edMemo">메모 (특이사항)</label><textarea id="edMemo">${esc(data.memo)}</textarea></div>
+      <div id="edErrors" class="error-box" hidden></div>`;
+    $('#edPhone').addEventListener('input', e => e.target.value = fmtPhone(e.target.value));
+  } else {
+    $('#editTitle').textContent = '학생 정보 수정';
+    body.innerHTML = `
+      <div id="edStudents"></div>
+      <button type="button" class="btn add" id="edAddStudent">+ 형제자매 추가</button>
+      <div class="field" style="margin-top:14px"><label>학부모 연락처 <span class="muted">(모르면 비워 두어도 됩니다)</span></label><div id="edContacts"></div>
+        <button type="button" class="btn add" id="edAddContact">+ 연락처 추가</button></div>
+      <div class="field"><label>차량 번호 <em>*</em></label><div id="edVehicles"></div><button type="button" class="btn add" id="edAddVehicle">+ 차량 추가</button></div>
+      <div class="field"><label for="edMemo">메모 (형제자매 공통 · 특이사항)</label><textarea id="edMemo">${esc(data.memo)}</textarea></div>
+      <div id="edErrors" class="error-box" hidden></div>`;
+    data.students.forEach(s => addStudentCard($('#edStudents'), s));
+    $('#edAddStudent').addEventListener('click', () => addStudentCard($('#edStudents')));
+    (data.contacts.length ? data.contacts : [{ relation: '부', phone: '' }, { relation: '모', phone: '' }])
+      .forEach(c => addContactRow($('#edContacts'), c.relation, false, c.phone));
+    $('#edAddContact').addEventListener('click', () => addContactRow($('#edContacts')));
+  }
+  (data.vehicles.length ? data.vehicles : [null]).forEach(v => addVehicleRow($('#edVehicles'), v));
+  $('#edAddVehicle').addEventListener('click', () => addVehicleRow($('#edVehicles')));
+  $('#editSheet').hidden = false; document.body.style.overflow = 'hidden';
+  body.scrollTop = 0;
+}
+$('#editClose').addEventListener('click', closeEdit);
+$('#editCancel').addEventListener('click', closeEdit);
+$('#editSheet').addEventListener('click', e => { if (e.target === $('#editSheet')) closeEdit(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#editSheet').hidden && $('#modal').hidden) closeEdit(); });
+$('#editForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!editing) return;
+  const errors = [];
+  $$('#editForm .invalid').forEach(el => el.classList.remove('invalid'));
+  let payload;
+  if (editing.kind === 'staff') {
+    const nameKo = $('#edNameKo').value.trim(), phone = $('#edPhone').value.trim();
+    if (!nameKo) { errors.push('한글 이름을 입력해 주세요.'); $('#edNameKo').classList.add('invalid'); }
+    if (!PHONE_RE.test(phone)) { errors.push('연락처를 확인해 주세요. (예: 010-1234-5678)'); $('#edPhone').classList.add('invalid'); }
+    const vehicles = collectVehicles($('#edVehicles'), errors);
+    payload = { id: editing.id, kind: ($('#editForm input[name=edKind]:checked') || {}).value || 'staff', nameKo, nameEn: $('#edNameEn').value.trim(),
+      dept: $('#edDept').value.trim(), role: $('#edRole').value.trim(), phone, vehicles, memo: $('#edMemo').value.trim() };
+  } else {
+    const students = $$('#edStudents .student-card').map((card, i) => {
+      const label = i === 0 ? '학생' : `형제자매 ${i}`;
+      const aff = card.querySelector('input[type=radio]:checked')?.value || '';
+      const nameKo = card.querySelector('.nameKo'), nameEn = card.querySelector('.nameEn'), cls = card.querySelector('.className');
+      if (!aff) { errors.push(`${label}: 소속을 선택해 주세요.`); card.querySelector('.seg').classList.add('invalid'); }
+      if (!nameKo.value.trim()) { errors.push(`${label}: 한글 이름을 입력해 주세요.`); nameKo.classList.add('invalid'); }
+      if (!nameEn.value.trim()) { errors.push(`${label}: 영어 이름을 입력해 주세요.`); nameEn.classList.add('invalid'); }
+      if (aff && !cls.value.trim()) { errors.push(`${label}: 반을 입력해 주세요.`); cls.classList.add('invalid'); }
+      return { id: card.dataset.sid || null, affiliation: aff, nameKo: nameKo.value.trim(), nameEn: nameEn.value.trim(), className: cls.value.trim() };
+    });
+    const contacts = [];
+    $$('#edContacts .contact-row').forEach(r => {
+      const rel = r.querySelector('.rel'), ph = r.querySelector('.phone');
+      if (!ph.value.trim()) return;
+      if (!PHONE_RE.test(ph.value)) { errors.push(`연락처 형식을 확인해 주세요: ${ph.value}`); ph.classList.add('invalid'); return; }
+      contacts.push({ relation: rel.value.trim() || '기타', phone: ph.value });
+    });
+    const vehicles = collectVehicles($('#edVehicles'), errors);
+    payload = { id: editing.id, students, contacts, vehicles, memo: $('#edMemo').value.trim() };
+  }
+  if (errors.length) { showErrors($('#edErrors'), errors); ($('#editForm .invalid') || $('#edErrors')).scrollIntoView({ block: 'center' }); return; }
+  $('#edErrors').hidden = true;
+  const btn = $('#editSave'); btn.disabled = true; btn.textContent = '저장 중...';
+  try { editing.kind === 'staff' ? await Api.updateStaff(payload) : await Api.updateFamily(payload); }
+  catch(err) { showErrors($('#edErrors'), ['저장하지 못했습니다: ' + errMsg(err)]); return; }
+  finally { btn.disabled = false; btn.textContent = '저장'; }
+  closeEdit();
+  toast('수정했습니다.');
+  if (!$('#sec-lookup').hidden && $('#plateQuery').value.trim()) doSearch();
+  if (!$('#sec-admin').hidden) reloadAdmin();
+});
 
 /* 관리자 관리 (최고 관리자만) */
 async function loadAdmins(){
